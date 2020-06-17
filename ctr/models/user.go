@@ -5,17 +5,18 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/astaxie/beego/orm"
 )
 
 type User struct {
-	Id         int    `orm:"column(id);auto" description:"用户id" json:"id"`
-	CreateTime string `orm:"column(create_time);size(20);null" description:"创建时间，时间戳" json:"create_time"`
-	Name       string `orm:"column(name);size(20);null" description:"姓名" json:"name"`
-	Email      string `orm:"column(email);size(50);null" description:"邮箱" json:"email"`
-	Pwd        string `orm:"column(pwd);size(128);null" description:"密码md5" json:"pwd"`
-	YuqueToken string `orm:"column(yuque_token);size(128);null" description:"用户yuque的Token" json:"yuque_token"`
+	Id         int       `orm:"column(id);auto" description:"用户id"`
+	CreateTime time.Time `orm:"column(create_time);type(timestamp);auto_now_add" description:"创建时间，时间戳"`
+	Name       string    `orm:"column(name);size(20);null" description:"姓名"`
+	Email      string    `orm:"column(email);size(50);null" description:"邮箱"`
+	Pwd        string    `orm:"column(pwd);size(128);null" description:"密码md5"`
+	YuqueToken string    `orm:"column(yuque_token);size(128);null" description:"用户yuque的Token"`
 }
 
 func (t *User) TableName() string {

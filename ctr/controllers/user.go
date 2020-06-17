@@ -3,33 +3,120 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/Sirupsen/logrus"
 	"github.com/ahojcn/EoA/ctr/models"
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
 	"io/ioutil"
 	"net/http"
-	"time"
+	"net/url"
 )
 
+// UserController operations for User
 type UserController struct {
 	beego.Controller
 	o orm.Ormer
-	resp models.Response
 }
-
 /*
-https://www.yuque.com/oauth2/authorize?client_id=FCEGPMmDcnjwDKJsTfoV&scope=group:read&redirect_uri=http://127.0.0.1:10240/user/oauth&state=123456&response_type=code
+https://www.yuque.com/oauth2/authorize
+?client_id=FCEGPMmDcnjwDKJsTfoV
+&scope=group:read
+&redirect_uri=http://127.0.0.1:10240/user/oauth
+&state=123456
+&response_type=code
 */
 func (c *UserController)OAuth() {
-	// 根据 code 换取用户 token
+	// 解析参数
 	code := c.GetString("code")
 	state := c.GetString("state")
-	logrus.Info(state)
+
+	authRedirectURL := beego.AppConfig.String("YuQue::AuthRedirectTo")
+	retUrlValue := url.Values{}
+	retUrlValue.Add("state", state)
+
+	// 根据 code 换取用户 token
+	token, err := GetUserToken(code)
+	if err != nil {
+		retUrlValue.Add("status", "-1")
+		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
+	}
+	// 根据 token 换取用户信息
+	userInfo, err := GetUserInfo(token)
+	if err != nil {
+		retUrlValue.Add("status", "-1")
+		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
+	}
+	// 检查用户是否在组织中
+	ok, err := CheckUserInGroup(userInfo)
+	if err != nil {
+		retUrlValue.Add("status", "-1")
+		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
+	}
+
+	// 用户不在组织中
+	if !ok {
+		retUrlValue.Add("status", "-1")
+		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
+	}
+
+	c.o = orm.NewOrm()
+	var user models.User
+	// 判断用户是否已经创建过了
+	qs := c.o.QueryTable(user)  // user相当于"user"，表示查user表
+	err = qs.Filter("yuque_token__exact", token).One(&user)
+
+	var id int64
+	if err != nil {
+		// 没有找到，新用户
+		id, _ = models.AddUser(&user)
+	} else {
+		// 找到了，老用户（已经yuque授权过）
+		id = int64(user.Id)
+	}
+
+	retUrlValue.Add("status", "-1")
+	retUrlValue.Add("id", string(id))
+	c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
+}
+
+// 获取组织的用户，检查用户是否在组织中
+func CheckUserInGroup(yuqueUserInfo *models.YuQueUserInfo) (ok bool, err error) {
+	// 获取组织信息
+	httpCli := http.Client{}
+	request, err := http.NewRequest("GET", "https://www.yuque.com/api/v2/groups/1167287/users", nil)
+	if err != nil {
+		logrus.Fatalf("获取组织信息失败 新建请求失败 %v", err)
+		return false, errors.New("检查用户权限失败")
+	}
+	request.Header.Add("X-Auth-Token", beego.AppConfig.String("YuQue::Token"))
+	resp, err := httpCli.Do(request)
+	if err != nil {
+		logrus.Fatalf("获取组织信息失败 获取组织信息失败 %v", err)
+		return false, errors.New("检查用户权限失败")
+	}
+	respBytes, err := ioutil.ReadAll(resp.Body)
+
+	var usersInGroup models.YuQueGroupUsers
+	_ = json.Unmarshal(respBytes, &usersInGroup)
+
+	// 检查用户是否在组织中
+	ok = false
+	for _, user := range usersInGroup.Data {
+		if user.UserID == yuqueUserInfo.Data.ID {
+			ok = true
+		}
+	}
+
+	return ok, nil
+}
+
+// 根据code换取用户token
+func GetUserToken(code string) (token string, err error) {
+	// 获取用户 token
 	clientID := beego.AppConfig.String("YuQue::ClientID")
 	clientSecret := beego.AppConfig.String("YuQue::ClientSecret")
 	grantType := "authorization_code"
-
 	type tmp struct {
 		ClientID string `json:"client_id"`
 		ClientSecret string `json:"client_secret"`
@@ -42,22 +129,28 @@ func (c *UserController)OAuth() {
 		Code:         code,
 		GrantType:    grantType,
 	}
-	logrus.Infoln(req)
-	byteData, _ := json.Marshal(&req)
+	byteData, err := json.Marshal(&req)
+	if err != nil {
+		logrus.Fatalf("换取token失败 解析参数错误 %v", err)
+		return "", errors.New("获取用户信息失败")
+	}
 	reader := bytes.NewReader(byteData)
 	request, err := http.NewRequest("POST", "https://www.yuque.com/oauth2/token", reader)
 	if err != nil {
-		logrus.Fatalf("http.NewRequest %v", err)
+		logrus.Fatalf("换取token失败 创建新请求失败 %v", err)
+		return "", errors.New("获取用户信息失败")
 	}
 	request.Header.Set("Content-Type", "application/json;charset=UTF-8")
-	client := http.Client{}
-	resp, err := client.Do(request)
+	httpCli := http.Client{}
+	resp, err := httpCli.Do(request)
 	if err != nil {
-		logrus.Fatalf("client.Do %v", err)
+		logrus.Fatalf("换取token失败 请求失败 %v", err)
+		return "", errors.New("获取用户信息失败")
 	}
 	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		logrus.Fatalf("ioutil.ReadAll %v", err)
+		logrus.Fatalf("换取token失败 读取请求的响应失败 %v", err)
+		return "", errors.New("获取用户信息失败")
 	}
 	type respToken struct {
 		AccessToken string `json:"access_token"`
@@ -65,111 +158,38 @@ func (c *UserController)OAuth() {
 		Scope string `json:"scope"`
 	}
 	var r respToken
-	logrus.Info(json.Unmarshal(respBytes, &r))
+	err = json.Unmarshal(respBytes, &r)
+	if err != nil {
+		logrus.Fatalf("换取token失败 解析请求返回值失败 %v", err)
+		return "", errors.New("获取用户信息失败")
+	}
 
+	return r.AccessToken, nil
+}
+
+// 根据token换取用户信息
+func GetUserInfo(token string) (yuqueUserInfo *models.YuQueUserInfo, err error) {
+	httpCli := http.Client{}
 	// 根据 token 获取用户信息
-	request, err = http.NewRequest("GET", "https://www.yuque.com/api/v2/user", nil)
+	request, err := http.NewRequest("GET", "https://www.yuque.com/api/v2/user", nil)
 	if err != nil {
-		logrus.Fatalf("获取用户信息失败 %v", err)
+		logrus.Fatalf("根据token换取用户信息失败 新建获取token的请求失败 %v", err)
+		return nil, errors.New("获取用户信息失败")
 	}
-	request.Header.Add("X-Auth-Token", r.AccessToken)
-	resp, err = client.Do(request)
+	request.Header.Add("X-Auth-Token", token)
+	resp, err := httpCli.Do(request)
 	if err != nil {
-		logrus.Fatalf("client.Do %v", err)
+		logrus.Fatalf("根据token换取用户信息失败 根据token获取用户信息失败 %v", err)
+		return nil, errors.New("获取用户信息失败")
 	}
-	respBytes, err = ioutil.ReadAll(resp.Body)
+	respBytes, err := ioutil.ReadAll(resp.Body)
 
-	type yuqueUserInfo struct {
-		Data struct {
-			ID int `json:"id"`
-			Type string `json:"type"`
-			SpaceID int `json:"space_id"`
-			AccountID int `json:"account_id"`
-			Login string `json:"login"`
-			Name string `json:"name"`
-			AvatarURL string `json:"avatar_url"`
-			BooksCount int `json:"books_count"`
-			PublicBooksCount int `json:"public_books_count"`
-			FollowersCount int `json:"followers_count"`
-			FollowingCount int `json:"following_count"`
-			Public int `json:"public"`
-			Description interface{} `json:"description"`
-			CreatedAt time.Time `json:"created_at"`
-			UpdatedAt time.Time `json:"updated_at"`
-			Serializer string `json:"_serializer"`
-		} `json:"data"`
-	}
-	var userInfo yuqueUserInfo
-	_ = json.Unmarshal(respBytes, &userInfo)
-
-	// 获取组织信息
-	request, err = http.NewRequest("GET", "https://www.yuque.com/api/v2/groups/1167287/users", nil)
+	var userInfo models.YuQueUserInfo
+	err = json.Unmarshal(respBytes, &userInfo)
 	if err != nil {
-		logrus.Fatalf("获取组织信息失败 %v", err)
-	}
-	request.Header.Add("X-Auth-Token", beego.AppConfig.String("YuQue::Token"))
-	resp, err = client.Do(request)
-	if err != nil {
-		logrus.Fatalf("获取组织信息失败 %v", err)
-	}
-	respBytes, err = ioutil.ReadAll(resp.Body)
-	type yuqueGroupUsers struct {
-		Data []struct {
-			ID int `json:"id"`
-			GroupID int `json:"group_id"`
-			UserID int `json:"user_id"`
-			User struct {
-				ID int `json:"id"`
-				Type string `json:"type"`
-				Login string `json:"login"`
-				Name string `json:"name"`
-				Description interface{} `json:"description"`
-				AvatarURL string `json:"avatar_url"`
-				FollowersCount int `json:"followers_count"`
-				FollowingCount int `json:"following_count"`
-				CreatedAt time.Time `json:"created_at"`
-				UpdatedAt time.Time `json:"updated_at"`
-				Serializer string `json:"_serializer"`
-			} `json:"user"`
-			Role int `json:"role"`
-			Status int `json:"status"`
-			CreatedAt time.Time `json:"created_at"`
-			UpdatedAt time.Time `json:"updated_at"`
-			Group interface{} `json:"group"`
-			Serializer string `json:"_serializer"`
-		} `json:"data"`
-	}
-	var usersInGroup yuqueGroupUsers
-	_ = json.Unmarshal(respBytes, &usersInGroup)
-
-	ok := false
-	for _, user := range usersInGroup.Data {
-		if user.UserID == userInfo.Data.ID {
-			ok = true
-		}
+		logrus.Fatalf("根据token换取用户信息失败 解析获取到的用户信息错误 %v", err)
+		return nil, errors.New("获取用户信息失败")
 	}
 
-	//if ok {
-	//	c.Redirect("http://www.baidu.com", 302)
-	//} else {
-	//	c.Redirect("http://google.com", 302)
-	//}
-	c.o = orm.NewOrm()
-	logrus.Warnln(string(time.Now().Unix()))
-	user := models.User{
-		CreateTime: string(time.Now().Unix()),
-		Name:       "",
-		Email:      "",
-		Pwd:        "",
-		YuqueToken: r.AccessToken,
-	}
-	//user_id, _ := models.AddUser(&user)
-	id, _ := c.o.Insert(&user)
-
-	//u, _ := models.GetUserById(int(id))
-	//logrus.Warnln(u.CreateTime)
-
-	logrus.Infoln(ok)
-	c.Data["json"] = id
-	c.ServeJSON()
+	return &userInfo, nil
 }
