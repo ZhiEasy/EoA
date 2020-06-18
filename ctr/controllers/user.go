@@ -59,10 +59,10 @@ func (c *UserController)OAuth() {
 
 	c.o = orm.NewOrm()
 	var user models.User
-	// 判断用户是否已经创建过了
+	// 根据语雀返回的用户id判断用户是否已经创建过了
 	qs := c.o.QueryTable(user)  // user相当于"user"，表示查user表
-	err = qs.Filter("yuque_token__exact", token).One(&user)
-	user.YuqueToken = token
+	err = qs.Filter("yuque_id__exact", userInfo.Data.ID).One(&user)
+	user.YuqueId = userInfo.Data.ID
 
 	var id int64
 	// 没有找到，新用户

@@ -16,7 +16,7 @@ type User struct {
 	Name       string    `orm:"column(name);size(20);null" description:"姓名"`
 	Email      string    `orm:"column(email);size(50);null" description:"邮箱"`
 	Pwd        string    `orm:"column(pwd);size(128);null" description:"密码md5"`
-	YuqueToken string    `orm:"column(yuque_token);size(128);null" description:"用户语雀的Token"`
+	YuqueId    int       `orm:"column(yuque_id);null" description:"用户语雀的Token"`
 	YuqueInfo  string    `orm:"column(yuque_info);null" description:"语雀用户信息"`
 }
 
