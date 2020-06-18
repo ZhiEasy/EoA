@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/ahojcn/EoA/ctr/models"
 	"github.com/astaxie/beego"
@@ -19,12 +20,8 @@ type UserController struct {
 	o orm.Ormer
 }
 /*
-https://www.yuque.com/oauth2/authorize
-?client_id=FCEGPMmDcnjwDKJsTfoV
-&scope=group:read
-&redirect_uri=http://127.0.0.1:10240/user/oauth
-&state=123456
-&response_type=code
+点击 https://www.yuque.com/oauth2/authorize?client_id=FCEGPMmDcnjwDKJsTfoV&scope=group:read&redirect_uri=http://127.0.0.1:10240/user/oauth&state=123456&response_type=code
+授权后的回调接口
 */
 func (c *UserController)OAuth() {
 	// 解析参数
@@ -67,16 +64,21 @@ func (c *UserController)OAuth() {
 	err = qs.Filter("yuque_token__exact", token).One(&user)
 
 	var id int64
+	// 没有找到，新用户
 	if err != nil {
-		// 没有找到，新用户
 		id, _ = models.AddUser(&user)
-	} else {
-		// 找到了，老用户（已经yuque授权过）
-		id = int64(user.Id)
+		retUrlValue.Add("status", "0")
+		retUrlValue.Add("id", fmt.Sprintf("%d", id))
+		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 	}
 
-	retUrlValue.Add("status", "-1")
-	retUrlValue.Add("id", string(id))
+	// 找到了，老用户（已经yuque授权过）
+	// TODO 判断已经授权的用户是否完善了信息
+	id = int64(user.Id)
+	retUrlValue.Add("status", "1")
+	retUrlValue.Add("id", fmt.Sprintf("%d", id))
+
+	// TODO 采用更安全的方式，比如 Session
 	c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 }
 
