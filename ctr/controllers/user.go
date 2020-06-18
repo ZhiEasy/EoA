@@ -62,10 +62,15 @@ func (c *UserController)OAuth() {
 	// 判断用户是否已经创建过了
 	qs := c.o.QueryTable(user)  // user相当于"user"，表示查user表
 	err = qs.Filter("yuque_token__exact", token).One(&user)
+	user.YuqueToken = token
 
 	var id int64
 	// 没有找到，新用户
 	if err != nil {
+		// 保存语雀返回的用户信息到 yuque_info
+		b, _ := json.Marshal(userInfo)
+		user.YuqueInfo = string(b)
+		// 添加用户
 		id, _ = models.AddUser(&user)
 		retUrlValue.Add("status", "0")
 		retUrlValue.Add("id", fmt.Sprintf("%d", id))
@@ -73,13 +78,37 @@ func (c *UserController)OAuth() {
 	}
 
 	// 找到了，老用户（已经yuque授权过）
-	// TODO 判断已经授权的用户是否完善了信息
+	// 判断这个已经授权过的用户是否完善了信息
+	if user.Pwd == "" || user.Name == "" || user.Email == "" {
+		// 如果没有完善信息
+		retUrlValue.Add("status", "0")
+		retUrlValue.Add("id", fmt.Sprintf("%d", id))
+		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
+	}
+	// 已经完善了信息
 	id = int64(user.Id)
 	retUrlValue.Add("status", "1")
 	retUrlValue.Add("id", fmt.Sprintf("%d", id))
 
 	// TODO 采用更安全的方式，比如 Session
 	c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
+}
+
+// 用户完善信息接口
+func (c *UserController) UpdateUserInfo() {
+	var respData models.Response
+	var userInfo models.UpdateUserInfoReq
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &userInfo)
+	if err != nil {
+		respData.Status = -1
+		respData.Msg = "参数错误"
+		respData.Data = nil
+	}
+
+	c.o = orm.NewOrm()
+
+	c.Data["json"] = respData
+	c.ServeJSON()
 }
 
 // 获取组织的用户，检查用户是否在组织中
