@@ -23,7 +23,7 @@ type UserController struct {
 点击 https://www.yuque.com/oauth2/authorize?client_id=FCEGPMmDcnjwDKJsTfoV&scope=group:read&redirect_uri=http://127.0.0.1:10240/user/oauth&state=123456&response_type=code
 授权后的回调接口
 */
-func (c *UserController)OAuth() {
+func (c *UserController) YuQueOAuthRedirect() {
 	// 解析参数
 	code := c.GetString("code")
 	state := c.GetString("state")

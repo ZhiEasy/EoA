@@ -7,7 +7,7 @@ import (
 
 func init() {
 	// 语雀授权回调接口
-	beego.Router("/user/oauth", &controllers.UserController{}, "get:OAuth")
+	beego.Router("/user/oauth/yuque", &controllers.UserController{}, "get:YuQueOAuthRedirect")
 	// 用户完善信息接口
 	beego.Router("/user", &controllers.UserController{}, "post:UpdateUserInfo")
 }
