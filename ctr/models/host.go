@@ -29,6 +29,20 @@ type Host struct {
 	RsaKey        string    `orm:"column(rsa_key);size(1024);null" description:"ssh的public key，暂时不用"`
 }
 
+type AddHostReq struct {
+	Ip string `json:"ip"`
+	Name string `json:"name"`
+	Description string `json:"description"`
+	LoginName string `json:"login_name"`
+	LoginPwd string `json:"login_pwd"`
+}
+
+type HostProfile struct {
+	Ip string `json:"ip"`
+	Name string `json:"name"`
+	Description string `json:"description"`
+}
+
 func (t *Host) TableName() string {
 	return "host"
 }

@@ -3,9 +3,12 @@ package controllers
 import (
 	"encoding/json"
 	"errors"
+	"github.com/Sirupsen/logrus"
 	"github.com/ahojcn/EoA/ctr/models"
+	"github.com/astaxie/beego/orm"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // HostController operations for Host
@@ -15,8 +18,36 @@ type HostController struct {
 
 func (c *HostController)AddHost() {
 	userId := c.LoginRequired()
+	userObj, err := models.GetUserById(userId)
+	if err != nil {
+		c.ReturnResponse(-1, "权限错误", nil, true)
+	}
 
-	// TODO 添加主机
+	var req models.AddHostReq
+	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
+		c.ReturnResponse(-1, "参数错误", nil, true)
+	}
+
+	c.o = orm.NewOrm()
+	hostObj := models.Host{
+		UserId:        userObj,
+		CreateTime:    time.Time{},
+		Ip:            req.Ip,
+		Name:          req.Name,
+		Description:   req.Description,
+		LoginName:     req.LoginName,
+		LoginPwd:      req.LoginPwd,
+	}
+
+	if _, err = models.AddHost(&hostObj); err != nil {
+		logrus.Warningf("User:%v 添加主机失败，Request：%v，错误信息：%v", userId, req, err)
+		c.ReturnResponse(-1, "添加失败", nil, true)
+	}
+
+
+	// TODO 返回主机的基本信息，带用户信息
+
+	// TODO 开一个协程去获取主机 base info
 }
 
 // URLMapping ...

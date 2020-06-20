@@ -20,6 +20,13 @@ type User struct {
 	YuqueInfo  string    `orm:"column(yuque_info);null" description:"语雀用户信息"`
 }
 
+type UpdateUserInfoReq struct {
+	Name string `json:"name"`
+	Email string `json:"email"`
+	Pwd string `json:"pwd"`
+	CPwd string `json:"cpwd"`
+}
+
 type UserProfile struct {
 	Id int `json:"id"`
 	CreateTime time.Time `json:"create_time"`

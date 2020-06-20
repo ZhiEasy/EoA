@@ -106,10 +106,9 @@ func (c *UserController) UpdateUserInfo() {
 		c.ReturnResponse(-1, "参数错误", nil, true)
 	}
 
-	c.o = orm.NewOrm()
 	user, err := models.GetUserById(userId)
 	if err != nil {
-		c.ReturnResponse(-1, "用户不存在", nil, true)
+		c.ReturnResponse(-1, "权限错误", nil, true)
 		return  // 让下面的 user 不报警告
 	}
 
@@ -127,13 +126,14 @@ func (c *UserController) UpdateUserInfo() {
 		c.ReturnResponse(-1, "更新用户信息失败", nil, true)
 	}
 
-	c.ReturnResponse(0, "更新信息成功", models.UserProfile{
+	d := models.UserProfile{
 		Id:         userId,
 		CreateTime: user.CreateTime,
 		Name:       user.Name,
 		Email:      user.Email,
 		YuqueId:    user.YuqueId,
-	}, true)
+	}
+	c.ReturnResponse(0, "更新信息成功", d, true)
 }
 
 // 获取组织的用户，检查用户是否在组织中
