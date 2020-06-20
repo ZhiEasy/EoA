@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/astaxie/beego/orm"
 )
 
 type HostInfo struct {
-	Id     int    `orm:"column(id);auto" description:"监控信息id"`
-	HostId *Host  `orm:"column(host_id);rel(fk)" description:"主机id"`
-	Info   string `orm:"column(info);null" description:"主机信息"`
+	Id         int       `orm:"column(id);auto" description:"监控信息id"`
+	HostId     *Host     `orm:"column(host_id);rel(fk)" description:"主机id"`
+	Info       string    `orm:"column(info);null" description:"主机信息"`
+	CreateTime time.Time `orm:"column(create_time);type(timestamp);auto_now_add" description:"创建时间"`
 }
 
 func (t *HostInfo) TableName() string {

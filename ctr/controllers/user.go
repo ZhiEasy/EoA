@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,8 +17,7 @@ import (
 
 // UserController operations for User
 type UserController struct {
-	beego.Controller
-	o orm.Ormer
+	BaseController
 }
 /*
 点击 https://www.yuque.com/oauth2/authorize?client_id=FCEGPMmDcnjwDKJsTfoV&scope=group:read&redirect_uri=http://127.0.0.1:10240/user/oauth&state=123456&response_type=code
@@ -74,6 +74,7 @@ func (c *UserController) YuQueOAuthRedirect() {
 		id, _ = models.AddUser(&user)
 		retUrlValue.Add("status", "0")
 		retUrlValue.Add("id", fmt.Sprintf("%d", id))
+		c.SetSession("user_id", id)
 		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 	}
 
@@ -82,13 +83,15 @@ func (c *UserController) YuQueOAuthRedirect() {
 	if user.Pwd == "" || user.Name == "" || user.Email == "" {
 		// 如果没有完善信息
 		retUrlValue.Add("status", "0")
-		retUrlValue.Add("id", fmt.Sprintf("%d", id))
+		retUrlValue.Add("id", fmt.Sprintf("%d", user.Id))
+		c.SetSession("user_id", user.Id)
 		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 	}
 	// 已经完善了信息
 	id = int64(user.Id)
 	retUrlValue.Add("status", "1")
-	retUrlValue.Add("id", fmt.Sprintf("%d", id))
+	retUrlValue.Add("id", fmt.Sprintf("%d", user.Id))
+	c.SetSession("user_id", user.Id)
 
 	// TODO 采用更安全的方式，比如 Session
 	c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
@@ -96,19 +99,41 @@ func (c *UserController) YuQueOAuthRedirect() {
 
 // 用户完善信息接口
 func (c *UserController) UpdateUserInfo() {
-	var respData models.Response
-	var userInfo models.UpdateUserInfoReq
-	err := json.Unmarshal(c.Ctx.Input.RequestBody, &userInfo)
-	if err != nil {
-		respData.Status = -1
-		respData.Msg = "参数错误"
-		respData.Data = nil
+	userId := c.LoginRequired()
+
+	var req models.UpdateUserInfoReq
+	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req) ; err != nil {
+		c.ReturnResponse(-1, "参数错误", nil, true)
 	}
 
 	c.o = orm.NewOrm()
+	user, err := models.GetUserById(userId)
+	if err != nil {
+		c.ReturnResponse(-1, "用户不存在", nil, true)
+		return  // 让下面的 user 不报警告
+	}
 
-	c.Data["json"] = respData
-	c.ServeJSON()
+	if req.Pwd != req.CPwd {
+		c.ReturnResponse(-1, "密码不一致", nil, true)
+	}
+
+	user.Name = req.Name
+	user.Email = req.Email
+	_, _ = md5.New().Write([]byte(req.Pwd))
+	user.Pwd = req.Pwd
+
+	// 更新用户信息
+	if err = models.UpdateUserById(user); err != nil {
+		c.ReturnResponse(-1, "更新用户信息失败", nil, true)
+	}
+
+	c.ReturnResponse(0, "更新信息成功", models.UserProfile{
+		Id:         userId,
+		CreateTime: user.CreateTime,
+		Name:       user.Name,
+		Email:      user.Email,
+		YuqueId:    user.YuqueId,
+	}, true)
 }
 
 // 获取组织的用户，检查用户是否在组织中

@@ -64,3 +64,10 @@ type YuQueGroupUsers struct {
 		Serializer string `json:"_serializer"`
 	} `json:"data"`
 }
+
+// 用户状态信息
+type UserStatus struct {
+	UID int64 `json:"uid"`
+	IsLogin bool `json:"is_login"`
+	Status int `json:"status"`
+}

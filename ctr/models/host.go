@@ -11,17 +11,22 @@ import (
 )
 
 type Host struct {
-	Id          int       `orm:"column(id);auto" description:"主机id"`
-	UserId      *User     `orm:"column(user_id);rel(fk)" description:"用户id"`
-	CreateTime  time.Time `orm:"column(create_time);type(timestamp);auto_now_add" description:"创建时间"`
-	Name        string    `orm:"column(name);size(20);null" description:"主机名"`
-	Comment     string    `orm:"column(comment);size(128);null" description:"主机描述"`
-	BaseInfo    string    `orm:"column(base_info);null" description:"主机信息"`
-	NeedInfo    int8      `orm:"column(need_info);null" description:"是否需要监控"`
-	GetInfoTime int8      `orm:"column(get_info_time);null" description:"获取主机监控时间间隔"`
-	Username    string    `orm:"column(username);size(128);null" description:"主机登录用户名"`
-	Pwd         string    `orm:"column(pwd);size(128);null" description:"主机密码"`
-	RsaKey      string    `orm:"column(rsa_key);size(1024);null" description:"ssh的public key，暂时不用"`
+	Id            int       `orm:"column(id);auto" description:"主机id"`
+	UserId        *User     `orm:"column(user_id);rel(fk)" description:"用户id"`
+	CreateTime    time.Time `orm:"column(create_time);type(timestamp);auto_now_add" description:"创建时间"`
+	Ip            string    `orm:"column(ip);size(128)" description:"主机ip"`
+	Name          string    `orm:"column(name);size(20);null" description:"主机名"`
+	Description   string    `orm:"column(description);size(128);null" description:"主机描述"`
+	BaseInfo      string    `orm:"column(base_info);null" description:"主机信息"`
+	NeedGetInfo   int8      `orm:"column(need_get_info);null" description:"是否开启监控"`
+	GetInfoSpec   string    `orm:"column(get_info_spec);size(20);null" description:"获取主机监控时间间隔"`
+	GetInfoTaskId string    `orm:"column(get_info_task_id);size(128);null" description:"主机监控的task id"`
+	MemLine       string    `orm:"column(mem_line);size(20);null" description:"内存使用情况范围[0,100]，如果不关心就设置为-1，比如[-1,80]"`
+	CpuLine       string    `orm:"column(cpu_line);size(20);null" description:"CPU使用情况范围[0,100]，如果不关心就设置为-1，比如[-1,80]"`
+	DiskLine      string    `orm:"column(disk_line);size(20);null" description:"磁盘占用情况范围[0,100]，如果不关心就设置为-1，比如[-1,80]"`
+	LoginName     string    `orm:"column(login_name);size(128);null" description:"主机登录用户名"`
+	LoginPwd      string    `orm:"column(login_pwd);size(128);null" description:"主机密码"`
+	RsaKey        string    `orm:"column(rsa_key);size(1024);null" description:"ssh的public key，暂时不用"`
 }
 
 func (t *Host) TableName() string {

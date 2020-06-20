@@ -20,6 +20,14 @@ type User struct {
 	YuqueInfo  string    `orm:"column(yuque_info);null" description:"语雀用户信息"`
 }
 
+type UserProfile struct {
+	Id int `json:"id"`
+	CreateTime time.Time `json:"create_time"`
+	Name string `json:"name"`
+	Email string `json:"email"`
+	YuqueId int `json:"yuque_id"`
+}
+
 func (t *User) TableName() string {
 	return "user"
 }

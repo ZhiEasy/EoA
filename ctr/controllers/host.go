@@ -6,23 +6,27 @@ import (
 	"github.com/ahojcn/EoA/ctr/models"
 	"strconv"
 	"strings"
-
-	"github.com/astaxie/beego"
 )
 
 // HostController operations for Host
 type HostController struct {
-	beego.Controller
+	BaseController
+}
+
+func (c *HostController)AddHost() {
+	userId := c.LoginRequired()
+
+	// TODO 添加主机
 }
 
 // URLMapping ...
-func (c *HostController) URLMapping() {
-	c.Mapping("Post", c.Post)
-	c.Mapping("GetOne", c.GetOne)
-	c.Mapping("GetAll", c.GetAll)
-	c.Mapping("Put", c.Put)
-	c.Mapping("Delete", c.Delete)
-}
+//func (c *HostController) URLMapping() {
+//	c.Mapping("Post", c.Post)
+//	c.Mapping("GetOne", c.GetOne)
+//	c.Mapping("GetAll", c.GetAll)
+//	c.Mapping("Put", c.Put)
+//	c.Mapping("Delete", c.Delete)
+//}
 
 // Post ...
 // @Title Post
