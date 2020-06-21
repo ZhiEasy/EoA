@@ -103,17 +103,17 @@ func (c *UserController) UpdateUserInfo() {
 
 	var req models.UpdateUserInfoReq
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req) ; err != nil {
-		c.ReturnResponse(-1, "参数错误", nil, true)
+		c.ReturnResponse(models.REQUEST_ERROR, nil, true)
 	}
 
 	user, err := models.GetUserById(userId)
 	if err != nil {
-		c.ReturnResponse(-1, "权限错误", nil, true)
+		c.ReturnResponse(models.AUTH_ERROR, nil, true)
 		return  // 让下面的 user 不报警告
 	}
 
 	if req.Pwd != req.CPwd {
-		c.ReturnResponse(-1, "密码不一致", nil, true)
+		c.ReturnResponse(models.AUTH_ERROR, nil, true)
 	}
 
 	user.Name = req.Name
@@ -123,17 +123,32 @@ func (c *UserController) UpdateUserInfo() {
 
 	// 更新用户信息
 	if err = models.UpdateUserById(user); err != nil {
-		c.ReturnResponse(-1, "更新用户信息失败", nil, true)
+		c.ReturnResponse(models.SERVER_ERROR, nil, true)
 	}
 
-	d := models.UserProfile{
-		Id:         userId,
+	c.ReturnResponse(models.SUCCESS, nil, true)
+}
+
+// 获取当前登录用户信息接口
+func (c *UserController) GetUserInfo() {
+	userId := c.LoginRequired()
+
+	user, err := models.GetUserById(userId)
+	if err != nil {
+		c.ReturnResponse(models.AUTH_ERROR, nil, true)
+		return
+	}
+
+	var yuque models.YuQueUserInfo
+	_ = json.Unmarshal([]byte(user.YuqueInfo), &yuque)
+	userInfo := models.UserProfile{
+		Id:         user.Id,
 		CreateTime: user.CreateTime,
 		Name:       user.Name,
 		Email:      user.Email,
-		YuqueId:    user.YuqueId,
+		AvatarUrl:  yuque.Data.AvatarURL,
 	}
-	c.ReturnResponse(0, "更新信息成功", d, true)
+	c.ReturnResponse(models.SUCCESS, userInfo, true)
 }
 
 // 获取组织的用户，检查用户是否在组织中

@@ -10,4 +10,6 @@ func init() {
 	beego.Router("/user/oauth/yuque", &controllers.UserController{}, "get:YuQueOAuthRedirect")
 	// 用户完善信息接口
 	beego.Router("/user", &controllers.UserController{}, "post:UpdateUserInfo")
+	// 获取当前登录的用户信息
+	beego.Router("/user", &controllers.UserController{}, "get:GetUserInfo")
 }

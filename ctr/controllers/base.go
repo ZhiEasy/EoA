@@ -20,9 +20,9 @@ func (c *BaseController)LoginRequired() int {
 	var resp models.Response
 	userId := c.GetSession("user_id")
 	if userId == nil {
-		resp.Status = -1
+		resp.Status = models.AUTH_ERROR
 		resp.Data = nil
-		resp.Msg = "认证失败"
+		resp.Msg = models.ResponseText(models.AUTH_ERROR)
 		c.Data["json"] = resp
 		c.ServeJSON()
 		c.StopRun()
@@ -31,10 +31,10 @@ func (c *BaseController)LoginRequired() int {
 }
 
 // 返回JSON Response信息
-func (c *BaseController)ReturnResponse(status int, msg string, data interface{}, stopRun bool) {
+func (c *BaseController)ReturnResponse(code int, data interface{}, stopRun bool) {
 	var resp models.Response
-	resp.Status = status
-	resp.Msg = msg
+	resp.Status = code
+	resp.Msg = models.ResponseText(code)
 	resp.Data = data
 	c.Data["json"] = resp
 	c.ServeJSON()

@@ -32,7 +32,7 @@ type UserProfile struct {
 	CreateTime time.Time `json:"create_time"`
 	Name string `json:"name"`
 	Email string `json:"email"`
-	YuqueId int `json:"yuque_id"`
+	AvatarUrl string `json:"avatar_url"`
 }
 
 func (t *User) TableName() string {

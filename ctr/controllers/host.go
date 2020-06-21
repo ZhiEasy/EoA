@@ -20,12 +20,12 @@ func (c *HostController)AddHost() {
 	userId := c.LoginRequired()
 	userObj, err := models.GetUserById(userId)
 	if err != nil {
-		c.ReturnResponse(-1, "权限错误", nil, true)
+		c.ReturnResponse(models.AUTH_ERROR, nil, true)
 	}
 
 	var req models.AddHostReq
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
-		c.ReturnResponse(-1, "参数错误", nil, true)
+		c.ReturnResponse(models.REQUEST_ERROR, nil, true)
 	}
 
 	c.o = orm.NewOrm()
@@ -41,9 +41,8 @@ func (c *HostController)AddHost() {
 
 	if _, err = models.AddHost(&hostObj); err != nil {
 		logrus.Warningf("User:%v 添加主机失败，Request：%v，错误信息：%v", userId, req, err)
-		c.ReturnResponse(-1, "添加失败", nil, true)
+		c.ReturnResponse(models.SERVER_ERROR, nil, true)
 	}
-
 
 	// TODO 返回主机的基本信息，带用户信息
 
