@@ -12,4 +12,8 @@ func init() {
 	beego.Router("/user", &controllers.UserController{}, "post:UpdateUserInfo")
 	// 获取当前登录的用户信息
 	beego.Router("/user", &controllers.UserController{}, "get:GetUserInfo")
+	// 添加主机
+	beego.Router("/host", &controllers.HostController{}, "post:AddHost")
+	// 测试主机连接
+	beego.Router("/host/test", &controllers.HostController{}, "post:HostConnectionTest")
 }

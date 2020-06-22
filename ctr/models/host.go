@@ -37,10 +37,25 @@ type AddHostReq struct {
 	LoginPwd string `json:"login_pwd"`
 }
 
+type HostConnection struct {
+	Ip string `json:"ip"`
+	LoginName string `json:"login_name"`
+	LoginPwd string `json:"login_pwd"`
+}
+
 type HostProfile struct {
 	Ip string `json:"ip"`
 	Name string `json:"name"`
 	Description string `json:"description"`
+	User User `json:"user"`
+	CreateTime time.Time `json:"create_time"`
+	BaseInfo string `json:"base_info"`
+	NeedGetInfo bool `json:"need_get_info"`
+	GetInfoSpec string `json:"get_info_spec"`
+	MemLine string `json:"mem_line"`
+	CpuLine string `json:"cpu_line"`
+	DiskLine string `json:"disk_line"`
+	WatchedUser []User `json:"watched_user"`
 }
 
 func (t *Host) TableName() string {

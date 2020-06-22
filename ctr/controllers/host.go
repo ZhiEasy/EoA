@@ -2,12 +2,12 @@ package controllers
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/ahojcn/EoA/ctr/models"
 	"github.com/astaxie/beego/orm"
-	"strconv"
-	"strings"
+	"golang.org/x/crypto/ssh"
+	"net"
 	"time"
 )
 
@@ -16,6 +16,7 @@ type HostController struct {
 	BaseController
 }
 
+// 添加主机
 func (c *HostController)AddHost() {
 	userId := c.LoginRequired()
 	userObj, err := models.GetUserById(userId)
@@ -44,162 +45,92 @@ func (c *HostController)AddHost() {
 		c.ReturnResponse(models.SERVER_ERROR, nil, true)
 	}
 
-	// TODO 返回主机的基本信息，带用户信息
-
 	// TODO 开一个协程去获取主机 base info
-}
-
-// URLMapping ...
-//func (c *HostController) URLMapping() {
-//	c.Mapping("Post", c.Post)
-//	c.Mapping("GetOne", c.GetOne)
-//	c.Mapping("GetAll", c.GetAll)
-//	c.Mapping("Put", c.Put)
-//	c.Mapping("Delete", c.Delete)
-//}
-
-// Post ...
-// @Title Post
-// @Description create Host
-// @Param	body		body 	models.Host	true		"body for Host content"
-// @Success 201 {int} models.Host
-// @Failure 403 body is empty
-// @router / [post]
-func (c *HostController) Post() {
-	var v models.Host
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if _, err := models.AddHost(&v); err == nil {
-			c.Ctx.Output.SetStatus(201)
-			c.Data["json"] = v
-		} else {
-			c.Data["json"] = err.Error()
-		}
-	} else {
-		c.Data["json"] = err.Error()
+	cliConf := SSHClientConfig{
+		Host:       req.Ip,
+		Port:       22,
+		Username:   req.LoginName,
+		Password:   req.LoginPwd,
 	}
-	c.ServeJSON()
-}
-
-// GetOne ...
-// @Title Get One
-// @Description get Host by id
-// @Param	id		path 	string	true		"The key for staticblock"
-// @Success 200 {object} models.Host
-// @Failure 403 :id is empty
-// @router /:id [get]
-func (c *HostController) GetOne() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	v, err := models.GetHostById(id)
+	start := time.Now().UnixNano()
+	err = cliConf.CreateClient()
+	end := time.Now().UnixNano()
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = v
+		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
 	}
-	c.ServeJSON()
+
+	d := make(map[string]int64)
+	d["连接用时(ms)"] = (end - start)/1e6
+	c.ReturnResponse(models.SUCCESS, d, true)
 }
 
-// GetAll ...
-// @Title Get All
-// @Description get Host
-// @Param	query	query	string	false	"Filter. e.g. col1:v1,col2:v2 ..."
-// @Param	fields	query	string	false	"Fields returned. e.g. col1,col2 ..."
-// @Param	sortby	query	string	false	"Sorted-by fields. e.g. col1,col2 ..."
-// @Param	order	query	string	false	"Order corresponding to each sortby field, if single value, apply to all sortby fields. e.g. desc,asc ..."
-// @Param	limit	query	string	false	"Limit the size of result set. Must be an integer"
-// @Param	offset	query	string	false	"Start position of result set. Must be an integer"
-// @Success 200 {object} models.Host
-// @Failure 403
-// @router / [get]
-func (c *HostController) GetAll() {
-	var fields []string
-	var sortby []string
-	var order []string
-	var query = make(map[string]string)
-	var limit int64 = 10
-	var offset int64
+// 测试主机连接
+func (c *HostController) HostConnectionTest()  {
+	c.LoginRequired()
 
-	// fields: col1,col2,entity.col3
-	if v := c.GetString("fields"); v != "" {
-		fields = strings.Split(v, ",")
-	}
-	// limit: 10 (default is 10)
-	if v, err := c.GetInt64("limit"); err == nil {
-		limit = v
-	}
-	// offset: 0 (default is 0)
-	if v, err := c.GetInt64("offset"); err == nil {
-		offset = v
-	}
-	// sortby: col1,col2
-	if v := c.GetString("sortby"); v != "" {
-		sortby = strings.Split(v, ",")
-	}
-	// order: desc,asc
-	if v := c.GetString("order"); v != "" {
-		order = strings.Split(v, ",")
-	}
-	// query: k:v,k:v
-	if v := c.GetString("query"); v != "" {
-		for _, cond := range strings.Split(v, ",") {
-			kv := strings.SplitN(cond, ":", 2)
-			if len(kv) != 2 {
-				c.Data["json"] = errors.New("Error: invalid query key/value pair")
-				c.ServeJSON()
-				return
-			}
-			k, v := kv[0], kv[1]
-			query[k] = v
-		}
-	}
-
-	l, err := models.GetAllHost(query, fields, sortby, order, offset, limit)
+	var req models.HostConnection
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = l
+		c.ReturnResponse(models.REQUEST_ERROR, nil, true)
 	}
-	c.ServeJSON()
+
+	cliConf := SSHClientConfig{
+		Host:       req.Ip,
+		Port:       22,
+		Username:   req.LoginName,
+		Password:   req.LoginPwd,
+	}
+	start := time.Now().UnixNano()
+	err = cliConf.CreateClient()
+	end := time.Now().UnixNano()
+	if err != nil {
+		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
+	}
+
+	d := make(map[string]int64)
+	d["连接用时(ms)"] = (end - start)/1e6
+	c.ReturnResponse(models.SUCCESS, d, true)
 }
 
-// Put ...
-// @Title Put
-// @Description update the Host
-// @Param	id		path 	string	true		"The id you want to update"
-// @Param	body		body 	models.Host	true		"body for Host content"
-// @Success 200 {object} models.Host
-// @Failure 403 :id is not int
-// @router /:id [put]
-func (c *HostController) Put() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	v := models.Host{Id: id}
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if err := models.UpdateHostById(&v); err == nil {
-			c.Data["json"] = "OK"
-		} else {
-			c.Data["json"] = err.Error()
-		}
-	} else {
-		c.Data["json"] = err.Error()
-	}
-	c.ServeJSON()
+type SSHClientConfig struct {
+	Host       string       //ip
+	Port       int64        // 端口
+	Username   string       //用户名
+	Password   string       //密码
+	Client	   *ssh.Client //ssh client
+	LastResult string       //最近一次运行的结果
 }
 
-// Delete ...
-// @Title Delete
-// @Description delete the Host
-// @Param	id		path 	string	true		"The id you want to delete"
-// @Success 200 {string} delete success!
-// @Failure 403 id is empty
-// @router /:id [delete]
-func (c *HostController) Delete() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	if err := models.DeleteHost(id); err == nil {
-		c.Data["json"] = "OK"
-	} else {
-		c.Data["json"] = err.Error()
+func (cliConf *SSHClientConfig)CreateClient() error {
+	config := ssh.ClientConfig{
+		User:              cliConf.Username,
+		Auth:              []ssh.AuthMethod{ssh.Password(cliConf.Password)},
+		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			return nil
+		},
+		Timeout:           10 * time.Second,
 	}
-	c.ServeJSON()
+	addr := fmt.Sprintf("%s:%d", cliConf.Host, cliConf.Port)
+	cli, err := ssh.Dial("tcp", addr, &config)
+	if  err != nil {
+		logrus.Errorf("connection error: %v", err)
+		return err
+	}
+	cliConf.Client = cli
+	return nil
+}
+
+func (cliConf *SSHClientConfig) RunShell(shell string) (err error) {
+	session, err := cliConf.Client.NewSession()
+	if err != nil {
+		return err
+	}
+
+	res, err := session.CombinedOutput(shell)
+	if err != nil {
+		return err
+	}
+
+	cliConf.LastResult = string(res)
+	return nil
 }

@@ -6,6 +6,7 @@ const (
 	REQUEST_ERROR = 4002
 	AUTH_ERROR = 4003
 	THIRED_ERROR = 4004
+	HOST_CONN_ERROR = 4005
 	SERVER_ERROR = 5001
 )
 
@@ -15,6 +16,7 @@ var responseText = map[int]string {
 	REQUEST_ERROR: "请求错误",
 	AUTH_ERROR: "权限错误",
 	SERVER_ERROR: "服务器错误",
+	HOST_CONN_ERROR: "主机连接失败",
 	THIRED_ERROR: "第三方系统错误",
 }
 
