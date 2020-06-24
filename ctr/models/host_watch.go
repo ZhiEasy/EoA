@@ -18,6 +18,10 @@ type HostWatch struct {
 	CreateTime time.Time `orm:"column(create_time);type(timestamp);auto_now_add" description:"关注时间"`
 }
 
+type AddHostWatchReq struct {
+	HostId int `json:"host_id"`
+}
+
 func (t *HostWatch) TableName() string {
 	return "host_watch"
 }

@@ -44,18 +44,42 @@ type HostConnection struct {
 }
 
 type HostProfile struct {
+	Id int `json:"id"`
 	Ip string `json:"ip"`
 	Name string `json:"name"`
 	Description string `json:"description"`
-	User User `json:"user"`
+	User UserProfile `json:"user"`
 	CreateTime time.Time `json:"create_time"`
 	BaseInfo string `json:"base_info"`
-	NeedGetInfo bool `json:"need_get_info"`
+	NeedGetInfo int8 `json:"need_get_info"`
 	GetInfoSpec string `json:"get_info_spec"`
 	MemLine string `json:"mem_line"`
 	CpuLine string `json:"cpu_line"`
 	DiskLine string `json:"disk_line"`
-	WatchedUser []User `json:"watched_user"`
+	WatchedUser []UserProfile `json:"watched_user"`
+}
+
+func (h *Host)Host2Profile() (hp HostProfile) {
+	var hostWatchs []HostWatch
+	o := orm.NewOrm()
+	_, _ = o.QueryTable(new(HostWatch)).Filter("host_id", h.Id).All(&hostWatchs)
+	for _, hw := range hostWatchs {
+		u, _ := GetUserById(hw.UserId.Id)
+		up := u.User2UserProfile()
+		hp.WatchedUser = append(hp.WatchedUser, up)
+	}
+	hp.Ip = h.Ip
+	hp.Name = h.Name
+	u, _ := GetUserById(h.UserId.Id)
+	hp.User = u.User2UserProfile()
+	hp.CreateTime = h.CreateTime
+	hp.BaseInfo = h.BaseInfo
+	hp.NeedGetInfo = h.NeedGetInfo
+	hp.GetInfoSpec = h.GetInfoSpec
+	hp.MemLine = h.MemLine
+	hp.CpuLine = h.CpuLine
+	hp.DiskLine = h.DiskLine
+	return hp
 }
 
 func (t *Host) TableName() string {

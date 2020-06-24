@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/ahojcn/EoA/ctr/models"
 	"github.com/astaxie/beego"
@@ -20,6 +19,7 @@ type UserController struct {
 	BaseController
 }
 /*
+语雀 OAuth
 点击 https://www.yuque.com/oauth2/authorize?client_id=FCEGPMmDcnjwDKJsTfoV&scope=group:read&redirect_uri=http://127.0.0.1:10240/user/oauth&state=123456&response_type=code
 授权后的回调接口
 */
@@ -35,25 +35,21 @@ func (c *UserController) YuQueOAuthRedirect() {
 	// 根据 code 换取用户 token
 	token, err := GetUserToken(code)
 	if err != nil {
-		retUrlValue.Add("status", "-1")
 		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 	}
 	// 根据 token 换取用户信息
 	userInfo, err := GetUserInfo(token)
 	if err != nil {
-		retUrlValue.Add("status", "-1")
 		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 	}
 	// 检查用户是否在组织中
 	ok, err := CheckUserInGroup(userInfo)
 	if err != nil {
-		retUrlValue.Add("status", "-1")
 		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 	}
 
 	// 用户不在组织中
 	if !ok {
-		retUrlValue.Add("status", "-1")
 		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 	}
 
@@ -72,29 +68,20 @@ func (c *UserController) YuQueOAuthRedirect() {
 		user.YuqueInfo = string(b)
 		// 添加用户
 		id, _ = models.AddUser(&user)
-		retUrlValue.Add("status", "0")
-		retUrlValue.Add("id", fmt.Sprintf("%d", id))
 		c.SetSession("user_id", id)
 		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
 	}
 
-	// 找到了，老用户（已经yuque授权过）
-	// 判断这个已经授权过的用户是否完善了信息
-	if user.Pwd == "" || user.Name == "" || user.Email == "" {
-		// 如果没有完善信息
-		retUrlValue.Add("status", "0")
-		retUrlValue.Add("id", fmt.Sprintf("%d", user.Id))
-		c.SetSession("user_id", user.Id)
-		c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
-	}
 	// 已经完善了信息
 	id = int64(user.Id)
-	retUrlValue.Add("status", "1")
-	retUrlValue.Add("id", fmt.Sprintf("%d", user.Id))
 	c.SetSession("user_id", user.Id)
-
-	// TODO 采用更安全的方式，比如 Session
 	c.Redirect(authRedirectURL + "?" + retUrlValue.Encode(), 302)
+}
+
+/*
+Github OAuth
+*/
+func (c *UserController)GithubOAuthRedirect() {
 }
 
 // 用户完善信息接口
@@ -113,7 +100,7 @@ func (c *UserController) UpdateUserInfo() {
 	}
 
 	if req.Pwd != req.CPwd {
-		c.ReturnResponse(models.AUTH_ERROR, nil, true)
+		c.ReturnResponse(models.PWD_ERROR, nil, true)
 	}
 
 	user.Name = req.Name
@@ -147,6 +134,12 @@ func (c *UserController) GetUserInfo() {
 		Name:       user.Name,
 		Email:      user.Email,
 		AvatarUrl:  yuque.Data.AvatarURL,
+	}
+
+	// 判断这个已经授权过的用户是否完善了信息
+	if user.Pwd == "" || user.Name == "" || user.Email == "" {
+		// 如果没有完善信息
+		c.ReturnResponse(models.NEED_UPDATE_INFO, userInfo, true)
 	}
 	c.ReturnResponse(models.SUCCESS, userInfo, true)
 }

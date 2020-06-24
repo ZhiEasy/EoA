@@ -14,6 +14,11 @@ func init() {
 	beego.Router("/user", &controllers.UserController{}, "get:GetUserInfo")
 	// 添加主机
 	beego.Router("/host", &controllers.HostController{}, "post:AddHost")
+	// 获取主机列表
+	beego.Router("/host", &controllers.HostController{}, "get:GetHosts")
 	// 测试主机连接
 	beego.Router("/host/test", &controllers.HostController{}, "post:HostConnectionTest")
+
+	// 关注一个主机
+	beego.Router("/host/watch", &controllers.HostWatchController{}, "post:AddHostWatch")
 }

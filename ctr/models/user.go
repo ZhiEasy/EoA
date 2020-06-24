@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -33,6 +34,17 @@ type UserProfile struct {
 	Name string `json:"name"`
 	Email string `json:"email"`
 	AvatarUrl string `json:"avatar_url"`
+}
+
+func (t *User)User2UserProfile() (up UserProfile) {
+	up.Id = t.Id
+	up.Email = t.Email
+	up.CreateTime = t.CreateTime
+	up.Name = t.Name
+	var yuqueInfo YuQueUserInfo
+	_ = json.Unmarshal([]byte(t.YuqueInfo), &yuqueInfo)
+	up.AvatarUrl = yuqueInfo.Data.AvatarURL
+	return up
 }
 
 func (t *User) TableName() string {

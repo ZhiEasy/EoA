@@ -29,7 +29,6 @@ func (c *HostController)AddHost() {
 		c.ReturnResponse(models.REQUEST_ERROR, nil, true)
 	}
 
-	c.o = orm.NewOrm()
 	hostObj := models.Host{
 		UserId:        userObj,
 		CreateTime:    time.Time{},
@@ -39,13 +38,23 @@ func (c *HostController)AddHost() {
 		LoginName:     req.LoginName,
 		LoginPwd:      req.LoginPwd,
 	}
-
-	if _, err = models.AddHost(&hostObj); err != nil {
+	//hostId, err := models.AddHost(&hostObj)
+	_, err = models.AddHost(&hostObj)
+	if err != nil {
 		logrus.Warningf("User:%v 添加主机失败，Request：%v，错误信息：%v", userId, req, err)
 		c.ReturnResponse(models.SERVER_ERROR, nil, true)
 	}
 
 	// TODO 开一个协程去获取主机 base info
+	//go func() {
+	//	host, _ := models.GetHostById(int(hostId))
+	//}()
+
+	err = AddHostWatch(userObj.Id, hostObj.Id)
+	if err != nil {
+		c.ReturnResponse(models.HOST_REWATCH, nil, true)
+	}
+
 	cliConf := SSHClientConfig{
 		Host:       req.Ip,
 		Port:       22,
@@ -59,8 +68,8 @@ func (c *HostController)AddHost() {
 		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
 	}
 
-	d := make(map[string]int64)
-	d["连接用时(ms)"] = (end - start)/1e6
+	d := make(map[string]string)
+	d["used"] = fmt.Sprintf("连接用时 %v ms", (end - start)/1e6)
 	c.ReturnResponse(models.SUCCESS, d, true)
 }
 
@@ -91,6 +100,38 @@ func (c *HostController) HostConnectionTest()  {
 	d["连接用时(ms)"] = (end - start)/1e6
 	c.ReturnResponse(models.SUCCESS, d, true)
 }
+
+// GET 获取主机列表
+func (c *HostController)GetHosts() {
+	userId := c.LoginRequired()
+
+	// 获取自己关注的主机信息
+	var myWatchs []models.HostProfile
+	c.o = orm.NewOrm()
+	qs := c.o.QueryTable(new(models.HostWatch))
+	var hws []*models.HostWatch
+	_, _ = qs.Filter("user_id__exact", userId).All(&hws)
+	for _, hw := range hws {
+		h, _ := models.GetHostById(hw.HostId.Id)
+		myWatchs = append(myWatchs, h.Host2Profile())
+	}
+
+	// 获取其他主机信息
+	notWatchs := make([]models.HostProfile, 0)
+	var n []*models.HostWatch
+	_, _ = qs.Exclude("user_id__exact", userId).All(&n)
+	for _, hw := range n {
+		h, _ := models.GetHostById(hw.HostId.Id)
+		notWatchs = append(notWatchs, h.Host2Profile())
+	}
+
+	d := make(map[string]interface{})
+	d["my_watchs"] = myWatchs
+	d["not_watchs"] = notWatchs
+	c.ReturnResponse(0, d, true)
+}
+
+// TODO 开启主机监控
 
 type SSHClientConfig struct {
 	Host       string       //ip
