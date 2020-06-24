@@ -18,7 +18,7 @@ type HostController struct {
 
 // 添加主机
 func (c *HostController)AddHost() {
-	userId := c.LoginRequired()
+	userId := c.LoginRequired(true)
 	userObj, err := models.GetUserById(userId)
 	if err != nil {
 		c.ReturnResponse(models.AUTH_ERROR, nil, true)
@@ -75,7 +75,7 @@ func (c *HostController)AddHost() {
 
 // 测试主机连接
 func (c *HostController) HostConnectionTest()  {
-	c.LoginRequired()
+	c.LoginRequired(true)
 
 	var req models.HostConnection
 	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)
@@ -103,7 +103,7 @@ func (c *HostController) HostConnectionTest()  {
 
 // GET 获取主机列表
 func (c *HostController)GetHosts() {
-	userId := c.LoginRequired()
+	userId := c.LoginRequired(true)
 
 	// 获取自己关注的主机信息
 	var myWatchs []models.HostProfile

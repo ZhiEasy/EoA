@@ -14,7 +14,7 @@ type HostWatchController struct {
 
 // 关注一个主机
 func (c *HostWatchController)AddHostWatch() {
-	userId := c.LoginRequired()
+	userId := c.LoginRequired(true)
 
 	var req models.AddHostWatchReq
 	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)

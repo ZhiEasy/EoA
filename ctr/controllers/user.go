@@ -86,7 +86,7 @@ func (c *UserController)GithubOAuthRedirect() {
 
 // 用户完善信息接口
 func (c *UserController) UpdateUserInfo() {
-	userId := c.LoginRequired()
+	userId := c.LoginRequired(false)
 
 	var req models.UpdateUserInfoReq
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req) ; err != nil {
@@ -118,7 +118,7 @@ func (c *UserController) UpdateUserInfo() {
 
 // 获取当前登录用户信息接口
 func (c *UserController) GetUserInfo() {
-	userId := c.LoginRequired()
+	userId := c.LoginRequired(false)
 
 	user, err := models.GetUserById(userId)
 	if err != nil {
