@@ -3,6 +3,7 @@
 
 .idea/
 bin/
+tmp/
 
 ### Go ###
 # Binaries for programs and plugins

@@ -67,14 +67,34 @@ func (c *HostController)AddHost() {
 	}
 
 	// TODO 开一个协程去获取主机 base info
+	// TODO 使用回调的方式获取基本信息
 	//go func() {
-	//	host, _ := models.GetHostById(int(hostId))
+	//	shell := fmt.Sprintf("mkdir -p /data/eoa/conf && cd /data/eoa/ && wget %s && cd conf && wget %s && cd .. && chmod +x svr_linux_amd64 && nohup ./svr_linux_amd64 > svr.log 2>&1 &", beego.AppConfig.String("svr::svrbinpath"), beego.AppConfig.String("svr::svrconfpath"))
+	//	logrus.Errorln("执行脚本: ", shell)
+	//	err := cliConf.RunShell(shell)
+	//	logrus.Errorln("执行脚本结果: ", cliConf.LastResult)
+	//	if err != nil {
+	//		logrus.Errorln("执行脚本出错: ", err.Error())
+	//		hostObj.BaseInfo = fmt.Sprintf("获取信息失败:%v", err.Error())
+	//		_ = models.UpdateHostById(&hostObj)
+	//	}
+	//	httpCli := http.Client{}
+	//	resp, err := httpCli.Get(fmt.Sprintf("http://%s:%s%s", req.Ip, beego.AppConfig.String("svr::svrport"), beego.AppConfig.String("svr::svrbaseinfopath")))
+	//	if err != nil {
+	//		logrus.Errorln("获取信息失败: ", err.Error())
+	//		hostObj.BaseInfo += fmt.Sprintf("获取信息失败:%v", err.Error())
+	//		_ = models.UpdateHostById(&hostObj)
+	//		return
+	//	}
+	//	info, _ :=ioutil.ReadAll(resp.Body)
+	//	logrus.Errorln(info)
 	//}()
 
-	err = AddHostWatch(userObj.Id, hostObj.Id)
-	if err != nil {
-		c.ReturnResponse(models.HOST_REWATCH, nil, true)
-	}
+	// 重复关注，不用管
+	_ = AddHostWatch(userObj.Id, hostObj.Id)
+	//if err != nil {
+	//	c.ReturnResponse(models.HOST_REWATCH, nil, true)
+	//}
 
 	d := make(map[string]string)
 	d["used"] = fmt.Sprintf("连接用时 %v ms", (end - start)/1e6)
@@ -97,8 +117,10 @@ func (c *HostController) HostConnectionTest()  {
 		Username:   req.LoginName,
 		Password:   req.LoginPwd,
 	}
+	logrus.Warnln(req)
 	start := time.Now().UnixNano()
 	err = cliConf.CreateClient()
+
 	end := time.Now().UnixNano()
 	if err != nil {
 		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
@@ -162,7 +184,7 @@ func (cliConf *SSHClientConfig)CreateClient() error {
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
-		Timeout:           10 * time.Second,
+		Timeout:           120 * time.Second,
 	}
 	addr := fmt.Sprintf("%s:%d", cliConf.Host, cliConf.Port)
 	cli, err := ssh.Dial("tcp", addr, &config)

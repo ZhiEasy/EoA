@@ -9,7 +9,6 @@ import (
 )
 
 func Init() {
-	logrus.Warnln(beego.AppConfig.String("sqlconn"));
 	err := orm.RegisterDataBase("default", "mysql", beego.AppConfig.String("sqlconn"))
 	if err != nil {
 		logrus.Panicf("注册数据库失败 %v", err)
