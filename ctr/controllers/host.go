@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/Sirupsen/logrus"
@@ -29,14 +31,33 @@ func (c *HostController)AddHost() {
 		c.ReturnResponse(models.REQUEST_ERROR, nil, true)
 	}
 
+	if req.Check() == false {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+	}
+
+	// 测试主机是否可以连接
+	cliConf := SSHClientConfig{
+		Host:       req.Ip,
+		Port:       22,
+		Username:   req.LoginName,
+		Password:   req.LoginPwd,
+	}
+	start := time.Now().UnixNano()
+	err = cliConf.CreateClient()
+	end := time.Now().UnixNano()
+	if err != nil {
+		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
+	}
+
+	hash := md5.New()
+	hash.Write([]byte(req.LoginPwd))
 	hostObj := models.Host{
 		UserId:        userObj,
-		CreateTime:    time.Time{},
 		Ip:            req.Ip,
 		Name:          req.Name,
 		Description:   req.Description,
 		LoginName:     req.LoginName,
-		LoginPwd:      req.LoginPwd,
+		LoginPwd:      hex.EncodeToString(hash.Sum(nil)),
 	}
 	//hostId, err := models.AddHost(&hostObj)
 	_, err = models.AddHost(&hostObj)
@@ -53,19 +74,6 @@ func (c *HostController)AddHost() {
 	err = AddHostWatch(userObj.Id, hostObj.Id)
 	if err != nil {
 		c.ReturnResponse(models.HOST_REWATCH, nil, true)
-	}
-
-	cliConf := SSHClientConfig{
-		Host:       req.Ip,
-		Port:       22,
-		Username:   req.LoginName,
-		Password:   req.LoginPwd,
-	}
-	start := time.Now().UnixNano()
-	err = cliConf.CreateClient()
-	end := time.Now().UnixNano()
-	if err != nil {
-		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
 	}
 
 	d := make(map[string]string)
@@ -101,12 +109,12 @@ func (c *HostController) HostConnectionTest()  {
 	c.ReturnResponse(models.SUCCESS, d, true)
 }
 
-// GET 获取主机列表
+// 获取主机列表
 func (c *HostController)GetHosts() {
 	userId := c.LoginRequired(true)
 
 	// 获取自己关注的主机信息
-	var myWatchs []models.HostProfile
+	myWatchs := make([]models.HostProfile, 0)
 	c.o = orm.NewOrm()
 	qs := c.o.QueryTable(new(models.HostWatch))
 	var hws []*models.HostWatch
@@ -118,11 +126,16 @@ func (c *HostController)GetHosts() {
 
 	// 获取其他主机信息
 	notWatchs := make([]models.HostProfile, 0)
-	var n []*models.HostWatch
-	_, _ = qs.Exclude("user_id__exact", userId).All(&n)
-	for _, hw := range n {
-		h, _ := models.GetHostById(hw.HostId.Id)
-		notWatchs = append(notWatchs, h.Host2Profile())
+	var hs []models.Host
+	qs = c.o.QueryTable(new(models.Host))
+	_, _ = qs.All(&hs)
+	for _, h := range hs {
+		// 筛选 host_watch 中 host_id=h.Id and user_id=userId
+		cnt, _ := c.o.QueryTable(new(models.HostWatch)).Filter("host_id", h.Id).Filter("user_id", userId).Count()
+		// 如果没有，说明没有关注这个主机，添加到返回值中
+		if cnt == 0 {
+			notWatchs = append(notWatchs, h.Host2Profile())
+		}
 	}
 
 	d := make(map[string]interface{})

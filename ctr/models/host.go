@@ -30,44 +30,59 @@ type Host struct {
 }
 
 type AddHostReq struct {
-	Ip string `json:"ip"`
-	Name string `json:"name"`
+	Ip          string `json:"ip"`
+	Name        string `json:"name"`
 	Description string `json:"description"`
-	LoginName string `json:"login_name"`
-	LoginPwd string `json:"login_pwd"`
+	LoginName   string `json:"login_name"`
+	LoginPwd    string `json:"login_pwd"`
+}
+
+// 校验添加主机请求参数是否合法
+func (req *AddHostReq) Check() (ok bool) {
+	if req.Ip == "" || req.Name == "" || req.Description == "" || req.LoginName == "" || req.LoginPwd == "" {
+		return false
+	}
+	return true
 }
 
 type HostConnection struct {
-	Ip string `json:"ip"`
+	Ip        string `json:"ip"`
 	LoginName string `json:"login_name"`
-	LoginPwd string `json:"login_pwd"`
+	LoginPwd  string `json:"login_pwd"`
 }
 
 type HostProfile struct {
-	Id int `json:"id"`
-	Ip string `json:"ip"`
-	Name string `json:"name"`
-	Description string `json:"description"`
-	User UserProfile `json:"user"`
-	CreateTime time.Time `json:"create_time"`
-	BaseInfo string `json:"base_info"`
-	NeedGetInfo int8 `json:"need_get_info"`
-	GetInfoSpec string `json:"get_info_spec"`
-	MemLine string `json:"mem_line"`
-	CpuLine string `json:"cpu_line"`
-	DiskLine string `json:"disk_line"`
-	WatchedUser []UserProfile `json:"watched_user"`
+	Id          int           `json:"id"`
+	Ip          string        `json:"ip"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	User        UserProfile   `json:"user"` // 创建者
+	CreateTime  time.Time     `json:"create_time"`
+	BaseInfo    string        `json:"base_info"`
+	NeedGetInfo int8          `json:"need_get_info"`
+	GetInfoSpec string        `json:"get_info_spec"`
+	MemLine     string        `json:"mem_line"`
+	CpuLine     string        `json:"cpu_line"`
+	DiskLine    string        `json:"disk_line"`
+	WatchedUser []UserProfile `json:"watched_user"` // 关注者
+	CanWatch    bool          `json:"can_watch"`    // 是否可以关注，如果是关注者则不可以
 }
 
-func (h *Host)Host2Profile() (hp HostProfile) {
+func (h *Host) Host2Profile() (hp HostProfile) {
 	var hostWatchs []HostWatch
 	o := orm.NewOrm()
 	_, _ = o.QueryTable(new(HostWatch)).Filter("host_id", h.Id).All(&hostWatchs)
+	hp.CanWatch = true
+	hp.WatchedUser = make([]UserProfile, 0)
 	for _, hw := range hostWatchs {
 		u, _ := GetUserById(hw.UserId.Id)
 		up := u.User2UserProfile()
+		if up.Id == h.UserId.Id {
+			hp.CanWatch = false
+		}
 		hp.WatchedUser = append(hp.WatchedUser, up)
 	}
+	hp.Id = h.Id
 	hp.Ip = h.Ip
 	hp.Name = h.Name
 	u, _ := GetUserById(h.UserId.Id)

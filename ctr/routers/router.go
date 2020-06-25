@@ -27,4 +27,6 @@ func init() {
 
 	// 关注一个主机
 	beego.Router("/host/watch", &controllers.HostWatchController{}, "post:AddHostWatch")
+	// 取消关注一个主机
+	beego.Router("/host/watch", &controllers.HostWatchController{}, "delete:DeleteHostWatch")
 }
