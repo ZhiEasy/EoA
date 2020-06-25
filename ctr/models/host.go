@@ -66,6 +66,7 @@ type HostProfile struct {
 	DiskLine    string        `json:"disk_line"`
 	WatchedUser []UserProfile `json:"watched_user"` // 关注者
 	CanWatch    bool          `json:"can_watch"`    // 是否可以关注，如果是关注者则不可以
+	CanDel      bool          `json:"can_del"`      // 是否可以删除，只有自己创建的主机才可以删除
 }
 
 func (h *Host) Host2Profile() (hp HostProfile) {

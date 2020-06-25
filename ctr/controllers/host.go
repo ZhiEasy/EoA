@@ -10,6 +10,7 @@ import (
 	"github.com/astaxie/beego/orm"
 	"golang.org/x/crypto/ssh"
 	"net"
+	"strconv"
 	"time"
 )
 
@@ -101,6 +102,29 @@ func (c *HostController)AddHost() {
 	c.ReturnResponse(models.SUCCESS, d, true)
 }
 
+// 删除主机
+// TODO 没有删除 host_info 的表，可能后面会存在问题
+func (c *HostController)DeleteHost() {
+	userId := c.LoginRequired(true)
+	hostId := c.GetString("host_id")
+	c.o = orm.NewOrm()
+	// 检查主机是否存在
+	cnt, err := c.o.QueryTable(new(models.Host)).Filter("id", hostId).Filter("user_id", userId).Count()
+	if err != nil || cnt != 0 {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+	}
+	// 删除这个主机关注列表
+	var hws []models.HostWatch
+	_, _ = c.o.QueryTable(new(models.HostWatch)).Filter("host_id", hostId).All(&hws)
+	for _, hw := range hws {
+		_ = models.DeleteHostWatch(hw.Id)
+	}
+	// 删除这个主机
+	id, _ := strconv.Atoi(hostId)
+	_ = models.DeleteHost(id)
+	c.ReturnResponse(models.SUCCESS, nil, true)
+}
+
 // 测试主机连接
 func (c *HostController) HostConnectionTest()  {
 	c.LoginRequired(true)
@@ -143,7 +167,13 @@ func (c *HostController)GetHosts() {
 	_, _ = qs.Filter("user_id__exact", userId).All(&hws)
 	for _, hw := range hws {
 		h, _ := models.GetHostById(hw.HostId.Id)
-		myWatchs = append(myWatchs, h.Host2Profile())
+		hp := h.Host2Profile()
+		if hp.User.Id == userId {
+			hp.CanDel = true
+		} else {
+			hp.CanDel = false
+		}
+		myWatchs = append(myWatchs, hp)
 	}
 
 	// 获取其他主机信息
@@ -156,7 +186,13 @@ func (c *HostController)GetHosts() {
 		cnt, _ := c.o.QueryTable(new(models.HostWatch)).Filter("host_id", h.Id).Filter("user_id", userId).Count()
 		// 如果没有，说明没有关注这个主机，添加到返回值中
 		if cnt == 0 {
-			notWatchs = append(notWatchs, h.Host2Profile())
+			hp := h.Host2Profile()
+			if hp.User.Id == userId {
+				hp.CanDel = true
+			} else {
+				hp.CanDel = false
+			}
+			notWatchs = append(notWatchs, hp)
 		}
 	}
 

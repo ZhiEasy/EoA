@@ -18,8 +18,11 @@ func init() {
 	beego.Router("/user", &controllers.UserController{}, "post:UpdateUserInfo")
 	// 获取当前登录的用户信息
 	beego.Router("/user", &controllers.UserController{}, "get:GetUserInfo")
+
 	// 添加主机
 	beego.Router("/host", &controllers.HostController{}, "post:AddHost")
+	// 删除主机
+	beego.Router("/host", &controllers.HostController{}, "delete:DeleteHost")
 	// 获取主机列表
 	beego.Router("/host", &controllers.HostController{}, "get:GetHosts")
 	// 测试主机连接
