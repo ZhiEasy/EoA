@@ -22,21 +22,26 @@ type User struct {
 }
 
 type UpdateUserInfoReq struct {
-	Name string `json:"name"`
+	Name  string `json:"name"`
 	Email string `json:"email"`
-	Pwd string `json:"pwd"`
-	CPwd string `json:"cpwd"`
+	Pwd   string `json:"pwd"`
+	CPwd  string `json:"cpwd"`
+}
+
+type UserLoginReq struct {
+	Email string `json:"email"`
+	Pwd   string `json:"pwd"`
 }
 
 type UserProfile struct {
-	Id int `json:"id"`
+	Id         int       `json:"id"`
 	CreateTime time.Time `json:"create_time"`
-	Name string `json:"name"`
-	Email string `json:"email"`
-	AvatarUrl string `json:"avatar_url"`
+	Name       string    `json:"name"`
+	Email      string    `json:"email"`
+	AvatarUrl  string    `json:"avatar_url"`
 }
 
-func (t *User)User2UserProfile() (up UserProfile) {
+func (t *User) User2UserProfile() (up UserProfile) {
 	up.Id = t.Id
 	up.Email = t.Email
 	up.CreateTime = t.CreateTime

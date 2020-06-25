@@ -6,8 +6,14 @@ import (
 )
 
 func init() {
+	// 获取语雀的 OAuth 地址
+	beego.Router("/oauth/yuque", &controllers.UserController{}, "get:GetYuQueOAuthPath")
 	// 语雀授权回调接口
 	beego.Router("/user/oauth/yuque", &controllers.UserController{}, "get:YuQueOAuthRedirect")
+	// 用户登录
+	beego.Router("/login", &controllers.UserController{}, "post:UserLogin")
+	// 退出登录
+	beego.Router("/logout", &controllers.UserController{}, "delete:UserLogout")
 	// 用户完善信息接口
 	beego.Router("/user", &controllers.UserController{}, "post:UpdateUserInfo")
 	// 获取当前登录的用户信息

@@ -13,27 +13,25 @@ type BaseController struct {
 	o orm.Ormer
 }
 
-
 // 登录和用户信息完整性校验
 // 未登录，返回给前端 JSON 信息
 // 已登录
 // 	1. 信息完善过，函数返回 user_id
 //  2. 信息未完善，返回状态
-func (c *BaseController)LoginRequired(needUserUpdateInfo bool) int {
-	var resp models.Response
+func (c *BaseController) LoginRequired(needUserUpdateInfo bool) int {
 	userId := c.GetSession("user_id")
 	if userId == nil {
-		c.ReturnResponse(models.AUTH_ERROR, resp, true)
+		c.ReturnResponse(models.AUTH_ERROR, nil, true)
 	}
 	if needUserUpdateInfo {
 		user, err := models.GetUserById(userId.(int))
 		if err != nil {
 			c.ReturnResponse(models.AUTH_ERROR, nil, true)
-			return userId.(int)  // 不让下面 user 报警告
+			return userId.(int) // 不让下面 user 报警告
 		}
 		var yuque models.YuQueUserInfo
 		_ = json.Unmarshal([]byte(user.YuqueInfo), &yuque)
-		userInfo := models.UserProfile {
+		userInfo := models.UserProfile{
 			Id:         user.Id,
 			CreateTime: user.CreateTime,
 			Name:       user.Name,
@@ -50,7 +48,7 @@ func (c *BaseController)LoginRequired(needUserUpdateInfo bool) int {
 }
 
 // 返回JSON Response信息
-func (c *BaseController)ReturnResponse(code int, data interface{}, stopRun bool) {
+func (c *BaseController) ReturnResponse(code int, data interface{}, stopRun bool) {
 	var resp models.Response
 	resp.Status = code
 	resp.Msg = models.ResponseText(code)

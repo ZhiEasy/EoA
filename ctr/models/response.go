@@ -10,6 +10,7 @@ const (
 	HOST_CONN_ERROR = 4005
 	PWD_ERROR = 4006
 	HOST_REWATCH = 4007
+	CPWD_ERROR = 4008
 	SERVER_ERROR = 5001
 )
 
@@ -18,11 +19,12 @@ var responseText = map[int]string {
 	NEED_UPDATE_INFO: "需要完善信息",
 	UNKNOW_ERROR: "未知错误",
 	REQUEST_ERROR: "请求错误",
-	AUTH_ERROR: "权限错误",
+	AUTH_ERROR: "未登录",
 	SERVER_ERROR: "服务器错误",
 	HOST_CONN_ERROR: "主机连接失败",
-	PWD_ERROR: "密码不一致",
+	PWD_ERROR: "密码错误",
 	HOST_REWATCH: "重复关注",
+	CPWD_ERROR: "密码不一致",
 	THIRED_ERROR: "第三方系统错误",
 }
 
