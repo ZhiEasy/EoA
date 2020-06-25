@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/Sirupsen/logrus"
 	"github.com/ahojcn/EoA/ctr/models"
+	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
 	"golang.org/x/crypto/ssh"
 	"net"
@@ -20,7 +21,7 @@ type HostController struct {
 }
 
 // 添加主机
-func (c *HostController)AddHost() {
+func (c *HostController) AddHost() {
 	userId := c.LoginRequired(true)
 	userObj, err := models.GetUserById(userId)
 	if err != nil {
@@ -38,10 +39,10 @@ func (c *HostController)AddHost() {
 
 	// 测试主机是否可以连接
 	cliConf := SSHClientConfig{
-		Host:       req.Ip,
-		Port:       22,
-		Username:   req.LoginName,
-		Password:   req.LoginPwd,
+		Host:     req.Ip,
+		Port:     22,
+		Username: req.LoginName,
+		Password: req.LoginPwd,
 	}
 	start := time.Now().UnixNano()
 	err = cliConf.CreateClient()
@@ -53,43 +54,37 @@ func (c *HostController)AddHost() {
 	hash := md5.New()
 	hash.Write([]byte(req.LoginPwd))
 	hostObj := models.Host{
-		UserId:        userObj,
-		Ip:            req.Ip,
-		Name:          req.Name,
-		Description:   req.Description,
-		LoginName:     req.LoginName,
-		LoginPwd:      hex.EncodeToString(hash.Sum(nil)),
+		UserId:      userObj,
+		Ip:          req.Ip,
+		Name:        req.Name,
+		Description: req.Description,
+		LoginName:   req.LoginName,
+		LoginPwd:    hex.EncodeToString(hash.Sum(nil)),
 	}
-	//hostId, err := models.AddHost(&hostObj)
-	_, err = models.AddHost(&hostObj)
+	hostId, err := models.AddHost(&hostObj)
+	//_, err = models.AddHost(&hostObj)
 	if err != nil {
 		logrus.Warningf("User:%v 添加主机失败，Request：%v，错误信息：%v", userId, req, err)
 		c.ReturnResponse(models.SERVER_ERROR, nil, true)
 	}
 
-	// TODO 开一个协程去获取主机 base info
-	// TODO 使用回调的方式获取基本信息
-	//go func() {
-	//	shell := fmt.Sprintf("mkdir -p /data/eoa/conf && cd /data/eoa/ && wget %s && cd conf && wget %s && cd .. && chmod +x svr_linux_amd64 && nohup ./svr_linux_amd64 > svr.log 2>&1 &", beego.AppConfig.String("svr::svrbinpath"), beego.AppConfig.String("svr::svrconfpath"))
-	//	logrus.Errorln("执行脚本: ", shell)
-	//	err := cliConf.RunShell(shell)
-	//	logrus.Errorln("执行脚本结果: ", cliConf.LastResult)
-	//	if err != nil {
-	//		logrus.Errorln("执行脚本出错: ", err.Error())
-	//		hostObj.BaseInfo = fmt.Sprintf("获取信息失败:%v", err.Error())
-	//		_ = models.UpdateHostById(&hostObj)
-	//	}
-	//	httpCli := http.Client{}
-	//	resp, err := httpCli.Get(fmt.Sprintf("http://%s:%s%s", req.Ip, beego.AppConfig.String("svr::svrport"), beego.AppConfig.String("svr::svrbaseinfopath")))
-	//	if err != nil {
-	//		logrus.Errorln("获取信息失败: ", err.Error())
-	//		hostObj.BaseInfo += fmt.Sprintf("获取信息失败:%v", err.Error())
-	//		_ = models.UpdateHostById(&hostObj)
-	//		return
-	//	}
-	//	info, _ :=ioutil.ReadAll(resp.Body)
-	//	logrus.Errorln(info)
-	//}()
+	go func() {
+		shell := fmt.Sprintf("mkdir -p ~/.eoa/conf/ && cd ~/.eoa/ && "+
+			"wget %s && "+
+			"echo '%d' > id && " +
+			"echo '%s:%s' > cb &&" +
+			"nohup sh -c 'sh ~/.eoa/deploy_svr.sh > deploy_svr.log 2>&1 &' && "+
+			"ls",
+			beego.AppConfig.String("svr::svrdeploysh"), hostId, beego.AppConfig.String("ctr::ctruri"), beego.AppConfig.String("httpport"))
+		logrus.Warnln("执行脚本: ", shell)
+		err := cliConf.RunShell(shell)
+		if err != nil {
+			logrus.Warnln("执行脚本失败: %v", err)
+			hostObj.BaseInfo = err.Error()
+			_ = models.UpdateHostById(&hostObj)
+			return
+		}
+	}()
 
 	// 重复关注，不用管
 	_ = AddHostWatch(userObj.Id, hostObj.Id)
@@ -98,19 +93,40 @@ func (c *HostController)AddHost() {
 	//}
 
 	d := make(map[string]string)
-	d["used"] = fmt.Sprintf("连接用时 %v ms", (end - start)/1e6)
+	d["used"] = fmt.Sprintf("连接用时 %v ms", (end-start)/1e6)
 	c.ReturnResponse(models.SUCCESS, d, true)
+}
+
+// svr 启动后的回调接口
+func (c *HostController) BaseInfoCallBack() {
+	var req models.HostBaseInfoReq
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+	}
+	var hostObj models.Host
+	c.o = orm.NewOrm()
+	err = c.o.QueryTable(new(models.Host)).Filter("id", req.Id).One(&hostObj)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_ERROR, nil, true)
+	}
+	hostObj.BaseInfo = req.BaseInfo
+	err = models.UpdateHostById(&hostObj)
+	if err != nil {
+		c.ReturnResponse(models.SERVER_ERROR, nil, true)
+	}
+	c.ReturnResponse(models.SUCCESS, nil, true)
 }
 
 // 删除主机
 // TODO 没有删除 host_info 的表，可能后面会存在问题
-func (c *HostController)DeleteHost() {
+func (c *HostController) DeleteHost() {
 	userId := c.LoginRequired(true)
 	hostId := c.GetString("host_id")
 	c.o = orm.NewOrm()
 	// 检查主机是否存在
 	cnt, err := c.o.QueryTable(new(models.Host)).Filter("id", hostId).Filter("user_id", userId).Count()
-	if err != nil || cnt != 0 {
+	if err != nil || cnt != 1 {
 		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
 	}
 	// 删除这个主机关注列表
@@ -126,7 +142,7 @@ func (c *HostController)DeleteHost() {
 }
 
 // 测试主机连接
-func (c *HostController) HostConnectionTest()  {
+func (c *HostController) HostConnectionTest() {
 	c.LoginRequired(true)
 
 	var req models.HostConnection
@@ -136,12 +152,11 @@ func (c *HostController) HostConnectionTest()  {
 	}
 
 	cliConf := SSHClientConfig{
-		Host:       req.Ip,
-		Port:       22,
-		Username:   req.LoginName,
-		Password:   req.LoginPwd,
+		Host:     req.Ip,
+		Port:     22,
+		Username: req.LoginName,
+		Password: req.LoginPwd,
 	}
-	logrus.Warnln(req)
 	start := time.Now().UnixNano()
 	err = cliConf.CreateClient()
 
@@ -150,13 +165,13 @@ func (c *HostController) HostConnectionTest()  {
 		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
 	}
 
-	d := make(map[string]int64)
-	d["连接用时(ms)"] = (end - start)/1e6
+	d := make(map[string]string)
+	d["used"] = fmt.Sprintf("连接用时 %v ms", (end-start)/1e6)
 	c.ReturnResponse(models.SUCCESS, d, true)
 }
 
 // 获取主机列表
-func (c *HostController)GetHosts() {
+func (c *HostController) GetHosts() {
 	userId := c.LoginRequired(true)
 
 	// 获取自己关注的主机信息
@@ -205,26 +220,26 @@ func (c *HostController)GetHosts() {
 // TODO 开启主机监控
 
 type SSHClientConfig struct {
-	Host       string       //ip
-	Port       int64        // 端口
-	Username   string       //用户名
-	Password   string       //密码
-	Client	   *ssh.Client //ssh client
-	LastResult string       //最近一次运行的结果
+	Host       string      //ip
+	Port       int64       // 端口
+	Username   string      //用户名
+	Password   string      //密码
+	Client     *ssh.Client //ssh client
+	LastResult string      //最近一次运行的结果
 }
 
-func (cliConf *SSHClientConfig)CreateClient() error {
+func (cliConf *SSHClientConfig) CreateClient() error {
 	config := ssh.ClientConfig{
-		User:              cliConf.Username,
-		Auth:              []ssh.AuthMethod{ssh.Password(cliConf.Password)},
+		User: cliConf.Username,
+		Auth: []ssh.AuthMethod{ssh.Password(cliConf.Password)},
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
-		Timeout:           120 * time.Second,
+		Timeout: 120 * time.Second,
 	}
 	addr := fmt.Sprintf("%s:%d", cliConf.Host, cliConf.Port)
 	cli, err := ssh.Dial("tcp", addr, &config)
-	if  err != nil {
+	if err != nil {
 		logrus.Errorf("connection error: %v", err)
 		return err
 	}

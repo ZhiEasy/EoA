@@ -51,6 +51,11 @@ type HostConnection struct {
 	LoginPwd  string `json:"login_pwd"`
 }
 
+type HostBaseInfoReq struct {
+	Id       string `json:"id"`
+	BaseInfo string `json:"base_info"`
+}
+
 type HostProfile struct {
 	Id          int           `json:"id"`
 	Ip          string        `json:"ip"`

@@ -15,6 +15,10 @@ type BaseInfoController struct {
 
 // 获取主机基础信息
 func (c *BaseInfoController)GetBaseInfo()  {
+	c.ReturnResponse(BaseInfo(), true)
+}
+
+func BaseInfo() string {
 	cpuinfo, _ := cpu.Info()
 	diskinfo, _ := disk.Usage("/")
 	hostinfo, _ := host.Info()
@@ -35,5 +39,5 @@ func (c *BaseInfoController)GetBaseInfo()  {
 	}
 	b, _ := json.Marshal(d)
 	s := string(b)
-	c.ReturnResponse(s, true)
+	return s
 }

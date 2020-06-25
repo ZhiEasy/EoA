@@ -28,6 +28,9 @@ func init() {
 	// 测试主机连接
 	beego.Router("/host/test", &controllers.HostController{}, "post:HostConnectionTest")
 
+	// svr 启动后的回调接口
+	beego.Router("/cb/host/baseinfo", &controllers.HostController{}, "post:BaseInfoCallBack")
+
 	// 关注一个主机
 	beego.Router("/host/watch", &controllers.HostWatchController{}, "post:AddHostWatch")
 	// 取消关注一个主机
