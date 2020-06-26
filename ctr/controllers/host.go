@@ -68,23 +68,27 @@ func (c *HostController) AddHost() {
 		c.ReturnResponse(models.SERVER_ERROR, nil, true)
 	}
 
-	go func() {
-		shell := fmt.Sprintf("mkdir -p ~/.eoa/conf/ && cd ~/.eoa/ && "+
-			"wget %s && "+
-			"echo '%d' > id && " +
-			"echo '%s:%s' > cb &&" +
-			"nohup sh -c 'sh ~/.eoa/deploy_svr.sh > deploy_svr.log 2>&1 &' && "+
-			"ls",
-			beego.AppConfig.String("svr::svrdeploysh"), hostId, beego.AppConfig.String("ctr::ctruri"), beego.AppConfig.String("httpport"))
-		logrus.Warnln("执行脚本: ", shell)
-		err := cliConf.RunShell(shell)
-		if err != nil {
-			logrus.Warnln("执行脚本失败: %v", err)
-			hostObj.BaseInfo = err.Error()
-			_ = models.UpdateHostById(&hostObj)
-			return
-		}
-	}()
+	// 这里本来是要把 svr 部署到目标主机上的
+	// 目前采取的方式是用户部署后，检测
+	// TODO 增加检测 svr 是否存活接口，在增加主机接口也检测一下 svr 是否存活
+	// TODO svr 提供增加检测是否存活的接口
+	//go func() {
+	//	shell := fmt.Sprintf("mkdir -p ~/.eoa/conf/ && cd ~/.eoa/ && "+
+	//		"wget %s && "+
+	//		"echo '%d' > id && "+
+	//		"echo '%s:%s' > cb &&"+
+	//		"nohup sh -c 'sh ~/.eoa/deploy_svr.sh > deploy_svr.log 2>&1 &' && "+
+	//		"ls",
+	//		beego.AppConfig.String("svr::svrdeploysh"), hostId, beego.AppConfig.String("ctr::ctruri"), beego.AppConfig.String("httpport"))
+	//	logrus.Warnln("执行脚本: ", shell)
+	//	err := cliConf.RunShell(shell)
+	//	if err != nil {
+	//		logrus.Warnln("执行脚本失败: %v", err)
+	//		hostObj.BaseInfo = err.Error()
+	//		_ = models.UpdateHostById(&hostObj)
+	//		return
+	//	}
+	//}()
 
 	// 重复关注，不用管
 	_ = AddHostWatch(userObj.Id, hostObj.Id)

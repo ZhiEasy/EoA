@@ -13,5 +13,5 @@ import (
 )
 
 func init() {
-	beego.Router("/host/baseinfo", &controllers.BaseInfoController{}, "get:GetBaseInfo")
+	beego.Router("/host", &controllers.HostController{}, "get:GetHostInfo")
 }
