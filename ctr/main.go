@@ -3,16 +3,25 @@ package main
 import (
 	"github.com/ahojcn/EoA/ctr/models"
 	_ "github.com/ahojcn/EoA/ctr/routers"
+	"github.com/astaxie/beego/context"
 	"github.com/astaxie/beego/orm"
 	"github.com/astaxie/beego/plugins/cors"
 
 	"github.com/astaxie/beego"
 )
 
+func init() {
+	beego.InsertFilter("*", beego.BeforeRouter, func(ctx *context.Context) {
+		ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "*")
+	})
+}
+
 func main() {
 	beego.InsertFilter("*", beego.BeforeRouter, cors.Allow(&cors.Options{
 		//AllowAllOrigins:  true,
-		AllowOrigins:     []string{"http://10.*.*.*:*", "http://localhost:*", "http://127.0.0.1:*", "http://*.natappfree.cc"},
+		AllowOrigins:     []string{
+			"http://10.*.*.*:*", "http://localhost:*", "http://127.0.0.1:*",
+			"http://*.*.*.*:*"},
 		AllowCredentials: true,
 		AllowMethods:     []string{"GET", "POST", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Access-Control-Allow-Origin", "Content-Type"},
@@ -23,6 +32,9 @@ func main() {
 		beego.BConfig.WebConfig.DirectoryIndex = true
 		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
 	}
+
+	beego.SetStaticPath("/downloads/", "downloads")
+
 	models.Init()
 	beego.Run()
 }
