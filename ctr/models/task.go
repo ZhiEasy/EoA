@@ -31,9 +31,12 @@ type TaskProfile struct {
 	CreateTime  time.Time   `json:"create_time"`
 }
 
-func (t *Task) Task2Profile() (tp TaskProfile) {
-	userObj, _ := GetUserById(t.UserId.Id)
-	return TaskProfile{
+func (t *Task) Task2Profile() (tp *TaskProfile) {
+	userObj, err := GetUserById(t.UserId.Id)
+	if err != nil {
+		return nil
+	}
+	return &TaskProfile{
 		Id:          t.Id,
 		User:        userObj.User2UserProfile(),
 		Name:        t.Name,

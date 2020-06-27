@@ -77,7 +77,7 @@ type HostProfile struct {
 	CanDel      bool                    `json:"can_del"`      // 是否可以删除，只有自己创建的主机才可以删除
 	BlameEmail  []HostBlameEmailProfile `json:"blame_email"`  // 责任人邮件
 	CanAddTask  bool                    `json:"can_add_task"` // 是否可以创建监控，每个主机只可以创建一个监控
-	TaskInfo    TaskProfile             `json:"task_info"`    // 如果已经创建了监控，显示监控信息
+	TaskInfo    *TaskProfile             `json:"task_info"`    // 如果已经创建了监控，显示监控信息
 }
 
 func (h *Host) Host2Profile() (hp HostProfile) {

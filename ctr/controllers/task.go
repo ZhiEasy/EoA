@@ -129,3 +129,5 @@ func (c *TaskController) AddHostInfoTask() {
 
 	c.ReturnResponse(models.SUCCESS, taskObj.Name, true)
 }
+
+// TODO 取消任务接口
