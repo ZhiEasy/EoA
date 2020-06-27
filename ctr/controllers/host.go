@@ -10,7 +10,9 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/orm"
 	"golang.org/x/crypto/ssh"
+	"io/ioutil"
 	"net"
+	"net/http"
 	"strconv"
 	"time"
 )
@@ -44,34 +46,53 @@ func (c *HostController) AddHost() {
 		Username: req.LoginName,
 		Password: req.LoginPwd,
 	}
-	start := time.Now().UnixNano()
 	err = cliConf.CreateClient()
-	end := time.Now().UnixNano()
 	if err != nil {
+		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
+	}
+
+	// svr 检测是否存活
+	bi, err := SvrTest(req.Ip)
+	if err != nil {
+		logrus.Warningf("User: %v, Request: %v, 测试主机svr连接失败：%s", userId, req, err.Error())
 		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
 	}
 
 	hash := md5.New()
 	hash.Write([]byte(req.LoginPwd))
+	// 将获取到的基本信息写入
+	tmp, err := json.Marshal(bi.Data)
 	hostObj := models.Host{
 		UserId:      userObj,
 		Ip:          req.Ip,
 		Name:        req.Name,
 		Description: req.Description,
+		BaseInfo:    string(tmp),
 		LoginName:   req.LoginName,
 		LoginPwd:    hex.EncodeToString(hash.Sum(nil)),
 	}
-	hostId, err := models.AddHost(&hostObj)
-	//_, err = models.AddHost(&hostObj)
+	//hostId, err := models.AddHost(&hostObj)
+	_, err = models.AddHost(&hostObj)
 	if err != nil {
 		logrus.Warningf("User:%v 添加主机失败，Request：%v，错误信息：%v", userId, req, err)
 		c.ReturnResponse(models.SERVER_ERROR, nil, true)
 	}
 
+	// 添加 blame email
+	// 注意发送报警的时候不要重复发送给 blame email 和关注列表
+	for _, e := range req.BlameEmailList {
+		_, err = models.AddHostBlameEmail(&models.HostBlameEmail{
+			HostId: &hostObj,
+			Email:  e,
+		})
+		if err != nil {
+			_ = models.DeleteHost(hostObj.Id)
+			c.ReturnResponse(models.SERVER_ERROR, nil, true)
+		}
+	}
+
 	// 这里本来是要把 svr 部署到目标主机上的
 	// 目前采取的方式是用户部署后，检测
-	// TODO 增加检测 svr 是否存活接口，在增加主机接口也检测一下 svr 是否存活
-	// TODO svr 提供增加检测是否存活的接口
 	//go func() {
 	//	shell := fmt.Sprintf("mkdir -p ~/.eoa/conf/ && cd ~/.eoa/ && "+
 	//		"wget %s && "+
@@ -92,13 +113,8 @@ func (c *HostController) AddHost() {
 
 	// 重复关注，不用管
 	_ = AddHostWatch(userObj.Id, hostObj.Id)
-	//if err != nil {
-	//	c.ReturnResponse(models.HOST_REWATCH, nil, true)
-	//}
 
-	d := make(map[string]string)
-	d["used"] = fmt.Sprintf("连接用时 %v ms", (end-start)/1e6)
-	c.ReturnResponse(models.SUCCESS, d, true)
+	c.ReturnResponse(models.SUCCESS, nil, true)
 }
 
 // svr 启动后的回调接口
@@ -124,6 +140,7 @@ func (c *HostController) BaseInfoCallBack() {
 
 // 删除主机
 // TODO 没有删除 host_info 的表，可能后面会存在问题
+// TODO 删除 host task 相关
 func (c *HostController) DeleteHost() {
 	userId := c.LoginRequired(true)
 	hostId := c.GetString("host_id")
@@ -139,17 +156,23 @@ func (c *HostController) DeleteHost() {
 	for _, hw := range hws {
 		_ = models.DeleteHostWatch(hw.Id)
 	}
+	// 删除这个主机的责任人邮件
+	var ble []models.HostBlameEmail
+	_, _ = c.o.QueryTable(new(models.HostBlameEmail)).Filter("host_id", hostId).All(&ble)
+	for _, i := range ble {
+		_ = models.DeleteHostBlameEmail(i.Id)
+	}
 	// 删除这个主机
 	id, _ := strconv.Atoi(hostId)
 	_ = models.DeleteHost(id)
 	c.ReturnResponse(models.SUCCESS, nil, true)
 }
 
-// 测试主机连接
+// ssh测试主机连接
 func (c *HostController) HostConnectionTest() {
 	c.LoginRequired(true)
 
-	var req models.HostConnection
+	var req models.HostConnectionSSHReq
 	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)
 	if err != nil {
 		c.ReturnResponse(models.REQUEST_ERROR, nil, true)
@@ -169,6 +192,28 @@ func (c *HostController) HostConnectionTest() {
 		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
 	}
 
+	d := make(map[string]string)
+	d["used"] = fmt.Sprintf("连接用时 %v ms", (end-start)/1e6)
+	c.ReturnResponse(models.SUCCESS, d, true)
+}
+
+// 测试连接svr
+// 检测 svr 是否部署完成
+func (c *HostController) HostConnectionSvr() {
+	c.LoginRequired(true)
+
+	var req models.HostConnectionSvrReq
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_ERROR, err, true)
+	}
+
+	start := time.Now().UnixNano()
+	_, err = SvrTest(req.Ip)
+	end := time.Now().UnixNano()
+	if err != nil {
+		c.ReturnResponse(models.HOST_CONN_ERROR, err, true)
+	}
 	d := make(map[string]string)
 	d["used"] = fmt.Sprintf("连接用时 %v ms", (end-start)/1e6)
 	c.ReturnResponse(models.SUCCESS, d, true)
@@ -264,4 +309,25 @@ func (cliConf *SSHClientConfig) RunShell(shell string) (err error) {
 
 	cliConf.LastResult = string(res)
 	return nil
+}
+
+func SvrTest(ip string) (*models.Response, error) {
+	httpCli := http.Client{}
+	resp, err := httpCli.Get(fmt.Sprintf("http://%s:%s/host", ip, beego.AppConfig.String("svr::svrport")))
+	if err != nil || resp.StatusCode != 200 {
+		return nil, err
+	}
+	var bs []byte
+	bs, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	var d models.Response
+	var bi models.BaseInfo
+	d.Data = bi
+	err = json.Unmarshal(bs, &d)
+	if err != nil {
+		return nil, err
+	}
+	return &d, nil
 }

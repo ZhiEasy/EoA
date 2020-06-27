@@ -15,6 +15,23 @@ type HostBlameEmail struct {
 	Email  string `orm:"column(email);size(48)" description:"邮件地址"`
 }
 
+type HostBlameEmailProfile struct {
+	Id    int    `json:"id"`
+	Email string `json:"email"`
+}
+
+func (hbe *HostBlameEmail) HostBlameEmail2Profile() HostBlameEmailProfile {
+	return HostBlameEmailProfile{
+		Id:    hbe.Id,
+		Email: hbe.Email,
+	}
+}
+
+type AddHostBlameEmailReq struct {
+	HostId int    `json:"host_id"`
+	Email  []string `json:"email"`
+}
+
 func (t *HostBlameEmail) TableName() string {
 	return "host_blame_email"
 }

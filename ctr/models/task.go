@@ -13,11 +13,44 @@ import (
 type Task struct {
 	Id          int       `orm:"column(id);auto" description:"任务id"`
 	UserId      *User     `orm:"column(user_id);rel(fk)" description:"用户id"`
+	HostId      *Host     `orm:"column(host_id);rel(fk)" description:"主机id"`
 	Name        string    `orm:"column(name);size(128)" description:"任务名称"`
 	Description string    `orm:"column(description);size(128)" description:"任务描述"`
 	Spec        string    `orm:"column(spec);size(20)" description:"任务执行时间"`
 	Type        int       `orm:"column(type)" description:"任务类型"`
 	CreateTime  time.Time `orm:"column(create_time);type(timestamp);auto_now_add" description:"创建时间"`
+}
+
+type TaskProfile struct {
+	Id          int         `json:"id"`
+	User        UserProfile `json:"user"`
+	Name        string      `json:"name"`
+	Description string      `json:"description"`
+	Spec        string      `json:"spec"`
+	Type        int         `json:"type"`
+	CreateTime  time.Time   `json:"create_time"`
+}
+
+func (t *Task) Task2Profile() (tp TaskProfile) {
+	userObj, _ := GetUserById(t.UserId.Id)
+	return TaskProfile{
+		Id:          t.Id,
+		User:        userObj.User2UserProfile(),
+		Name:        t.Name,
+		Description: t.Description,
+		Spec:        t.Spec,
+		Type:        t.Type,
+		CreateTime:  t.CreateTime,
+	}
+}
+
+type AddHostInfoTask struct {
+	HostId      int       `json:"host_id"`
+	Description string    `json:"description"`
+	Spec        string    `json:"spec"`
+	MemLine     []float64 `json:"mem_line"`
+	CpuLine     []float64 `json:"cpu_line"`
+	DiskLine    []float64 `json:"disk_line"`
 }
 
 func (t *Task) TableName() string {

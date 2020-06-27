@@ -25,8 +25,10 @@ func init() {
 	beego.Router("/host", &controllers.HostController{}, "delete:DeleteHost")
 	// 获取主机列表
 	beego.Router("/host", &controllers.HostController{}, "get:GetHosts")
-	// 测试主机连接
-	beego.Router("/host/test", &controllers.HostController{}, "post:HostConnectionTest")
+	// 测试主机ssh连接
+	beego.Router("/host/ssh", &controllers.HostController{}, "post:HostConnectionTest")
+	// 测试主机svr连接
+	beego.Router("/host/svr", &controllers.HostController{}, "post:HostConnectionSvr")
 
 	// svr 启动后的回调接口
 	beego.Router("/cb/host/baseinfo", &controllers.HostController{}, "post:BaseInfoCallBack")
@@ -35,4 +37,12 @@ func init() {
 	beego.Router("/host/watch", &controllers.HostWatchController{}, "post:AddHostWatch")
 	// 取消关注一个主机
 	beego.Router("/host/watch", &controllers.HostWatchController{}, "delete:DeleteHostWatch")
+
+	// 创建主机监控
+	beego.Router("/task/host", &controllers.TaskController{}, "post:AddHostInfoTask")
+
+	// 增加一个负责人邮件
+	beego.Router("/host/blame", &controllers.HostBlameEmailController{}, "post:AddHostBlameEmail")
+	// 删除一个负责人邮件
+	beego.Router("/host/blame", &controllers.HostBlameEmailController{}, "delete:DeleteHostBlameEmail")
 }

@@ -3,6 +3,7 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Sirupsen/logrus"
 	"github.com/astaxie/beego/toolbox"
 	"testing"
 	"time"
@@ -20,6 +21,7 @@ func TestBeegoToolBox(t *testing.T)  {
 	}
 	toolbox.AddTask("myTask", tk)
 	toolbox.StartTask()
+	logrus.Errorln(toolbox.AdminTaskList)
 
 	//for k, v := range toolbox.AdminTaskList {
 	//	fmt.Println("key -> ", k, "v -> ")

@@ -2,170 +2,130 @@ package controllers
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
+	"github.com/Sirupsen/logrus"
 	"github.com/ahojcn/EoA/ctr/models"
-	"strconv"
-	"strings"
-
-	"github.com/astaxie/beego"
+	"github.com/astaxie/beego/orm"
+	"github.com/astaxie/beego/toolbox"
+	"time"
 )
 
 // TaskController operations for Task
 type TaskController struct {
-	beego.Controller
+	BaseController
 }
 
-// URLMapping ...
-func (c *TaskController) URLMapping() {
-	c.Mapping("Post", c.Post)
-	c.Mapping("GetOne", c.GetOne)
-	c.Mapping("GetAll", c.GetAll)
-	c.Mapping("Put", c.Put)
-	c.Mapping("Delete", c.Delete)
-}
-
-// Post ...
-// @Title Post
-// @Description create Task
-// @Param	body		body 	models.Task	true		"body for Task content"
-// @Success 201 {int} models.Task
-// @Failure 403 body is empty
-// @router / [post]
-func (c *TaskController) Post() {
-	var v models.Task
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if _, err := models.AddTask(&v); err == nil {
-			c.Ctx.Output.SetStatus(201)
-			c.Data["json"] = v
-		} else {
-			c.Data["json"] = err.Error()
-		}
-	} else {
-		c.Data["json"] = err.Error()
-	}
-	c.ServeJSON()
-}
-
-// GetOne ...
-// @Title Get One
-// @Description get Task by id
-// @Param	id		path 	string	true		"The key for staticblock"
-// @Success 200 {object} models.Task
-// @Failure 403 :id is empty
-// @router /:id [get]
-func (c *TaskController) GetOne() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	v, err := models.GetTaskById(id)
+// 创建主机监控报警
+// TODO ctr 系统重新启动时候将以前的任务重建
+func (c *TaskController) AddHostInfoTask() {
+	userId := c.LoginRequired(true)
+	var req models.AddHostInfoTask
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &req)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = v
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
 	}
-	c.ServeJSON()
-}
-
-// GetAll ...
-// @Title Get All
-// @Description get Task
-// @Param	query	query	string	false	"Filter. e.g. col1:v1,col2:v2 ..."
-// @Param	fields	query	string	false	"Fields returned. e.g. col1,col2 ..."
-// @Param	sortby	query	string	false	"Sorted-by fields. e.g. col1,col2 ..."
-// @Param	order	query	string	false	"Order corresponding to each sortby field, if single value, apply to all sortby fields. e.g. desc,asc ..."
-// @Param	limit	query	string	false	"Limit the size of result set. Must be an integer"
-// @Param	offset	query	string	false	"Start position of result set. Must be an integer"
-// @Success 200 {object} models.Task
-// @Failure 403
-// @router / [get]
-func (c *TaskController) GetAll() {
-	var fields []string
-	var sortby []string
-	var order []string
-	var query = make(map[string]string)
-	var limit int64 = 10
-	var offset int64
-
-	// fields: col1,col2,entity.col3
-	if v := c.GetString("fields"); v != "" {
-		fields = strings.Split(v, ",")
-	}
-	// limit: 10 (default is 10)
-	if v, err := c.GetInt64("limit"); err == nil {
-		limit = v
-	}
-	// offset: 0 (default is 0)
-	if v, err := c.GetInt64("offset"); err == nil {
-		offset = v
-	}
-	// sortby: col1,col2
-	if v := c.GetString("sortby"); v != "" {
-		sortby = strings.Split(v, ",")
-	}
-	// order: desc,asc
-	if v := c.GetString("order"); v != "" {
-		order = strings.Split(v, ",")
-	}
-	// query: k:v,k:v
-	if v := c.GetString("query"); v != "" {
-		for _, cond := range strings.Split(v, ",") {
-			kv := strings.SplitN(cond, ":", 2)
-			if len(kv) != 2 {
-				c.Data["json"] = errors.New("Error: invalid query key/value pair")
-				c.ServeJSON()
-				return
-			}
-			k, v := kv[0], kv[1]
-			query[k] = v
-		}
-	}
-
-	l, err := models.GetAllTask(query, fields, sortby, order, offset, limit)
+	userObj, err := models.GetUserById(userId)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = l
+		c.ReturnResponse(models.AUTH_ERROR, nil, true)
 	}
-	c.ServeJSON()
-}
+	hostObj, err := models.GetHostById(req.HostId)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+		return
+	}
 
-// Put ...
-// @Title Put
-// @Description update the Task
-// @Param	id		path 	string	true		"The id you want to update"
-// @Param	body		body 	models.Task	true		"body for Task content"
-// @Success 200 {object} models.Task
-// @Failure 403 :id is not int
-// @router /:id [put]
-func (c *TaskController) Put() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	v := models.Task{Id: id}
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if err := models.UpdateTaskById(&v); err == nil {
-			c.Data["json"] = "OK"
-		} else {
-			c.Data["json"] = err.Error()
+	// 更新主机信息
+	dls, err := json.Marshal(req.DiskLine)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+	}
+	hostObj.DiskLine = string(dls)
+	mls, err := json.Marshal(req.MemLine)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+	}
+	hostObj.MemLine = string(mls)
+	cls, err := json.Marshal(req.CpuLine)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+	}
+	hostObj.CpuLine = string(cls)
+	_ = models.UpdateHostById(hostObj)
+
+	var taskObj models.Task
+	taskObj.UserId = userObj
+	taskObj.HostId = hostObj
+	taskObj.Spec = req.Spec
+	taskObj.Name = fmt.Sprintf("%v", time.Now().Unix())
+	taskObj.Description = req.Description
+	taskObj.Type = 0 // 0 主机监控
+	_, _ = models.AddTask(&taskObj)
+
+	// 创建 Task
+	t := toolbox.NewTask(taskObj.Name, req.Spec, func() error {
+		resp, err := SvrTest(hostObj.Ip)
+		if err != nil {
+			logrus.Warnf("监控：获取主机信息失败 %v", err)
+			return nil
 		}
-	} else {
-		c.Data["json"] = err.Error()
-	}
-	c.ServeJSON()
-}
+		var data models.BaseInfo
+		tmp, _ := json.Marshal(resp.Data)
+		_ = json.Unmarshal([]byte(string(tmp)), &data)
 
-// Delete ...
-// @Title Delete
-// @Description delete the Task
-// @Param	id		path 	string	true		"The id you want to delete"
-// @Success 200 {string} delete success!
-// @Failure 403 id is empty
-// @router /:id [delete]
-func (c *TaskController) Delete() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	if err := models.DeleteTask(id); err == nil {
-		c.Data["json"] = "OK"
-	} else {
-		c.Data["json"] = err.Error()
-	}
-	c.ServeJSON()
+		// 整理邮件列表
+		// 整理邮件列表放在这里是因为可能会删除一些邮件负责人，当放在外面时候就获取不到最新的邮件列表了
+		var emailList []string
+		var hws []models.HostWatch
+		c.o = orm.NewOrm()
+		_, _ = c.o.QueryTable(new(models.HostWatch)).Filter("user_id", userObj.Id).Filter("host_id", hostObj.Id).All(&hws)
+		for _, e := range hws {
+			emailList = append(emailList, e.Email)
+		}
+		var hbe []models.HostBlameEmail
+		_, _ = c.o.QueryTable(new(models.HostBlameEmail)).Filter("host_id", hostObj.Id).All(&hbe)
+		for _, e := range hbe {
+			emailList = append(emailList, e.Email)
+		}
+
+		if data.MemInfo.UsedPercent > req.MemLine[1] || data.MemInfo.UsedPercent < req.MemLine[0] {
+			logrus.Infof("内存报警：已使用%v，限制条件%v\n", data.MemInfo.UsedPercent, req.MemLine)
+			context := fmt.Sprintf("任务Id：%s<br/>"+
+				"主机IP：%s<br/>"+
+				"报警原因：当前内存使用率超出范围<br/>"+
+				"设定范围：%s<br/>"+
+				"<p style=\"color: red;\">当前：%v</p>", taskObj.Name, hostObj.Ip, hostObj.MemLine, data.MemInfo.UsedPercent)
+			SendMail(emailList, "EoA主机监控报警", context)
+		}
+		if data.CpuInfo.PercentTotal[0] > req.CpuLine[1] || data.CpuInfo.PercentTotal[0] < req.CpuLine[0] {
+			logrus.Infof("CPU报警：已使用%v，限制条件%v\n", data.CpuInfo.PercentTotal[0], req.CpuLine)
+			context := fmt.Sprintf("任务Id：%s<br/>"+
+				"主机IP：%s<br/>"+
+				"报警原因：当前【CPU使用率】超出范围<br/>"+
+				"设定范围：%s<br/>"+
+				"<p style=\"color: red;\">当前：%v</p>", taskObj.Name, hostObj.Ip, hostObj.CpuLine, data.CpuInfo.PercentTotal)
+			SendMail(emailList, "EoA主机监控报警", context)
+		}
+		if data.DiskInfo.UsedPercent > req.DiskLine[1] || data.DiskInfo.UsedPercent < req.DiskLine[0] {
+			logrus.Infof("CPU报警：已使用%v，限制条件%v\n", data.DiskInfo.UsedPercent, req.DiskLine)
+			context := fmt.Sprintf("任务Id：%s<br/>"+
+				"主机IP：%s<br/>"+
+				"报警原因：当前【磁盘使用率】超出范围<br/>"+
+				"设定范围：%s<br/>"+
+				"<p style=\"color: red;\">当前：%v</p>", taskObj.Name, hostObj.Ip, hostObj.DiskLine, data.DiskInfo.UsedPercent)
+			SendMail(emailList, "EoA主机监控报警", context)
+		}
+
+		// 保存监控信息
+		hostinfo := models.HostInfo{
+			HostId:     hostObj,
+			Info:       string(tmp),
+		}
+		_, _ = models.AddHostInfo(&hostinfo)
+
+		return nil
+	})
+	toolbox.AddTask(taskObj.Name, t)
+	toolbox.StartTask()
+
+	c.ReturnResponse(models.SUCCESS, taskObj.Name, true)
 }
