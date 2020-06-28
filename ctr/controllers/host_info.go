@@ -2,170 +2,66 @@ package controllers
 
 import (
 	"encoding/json"
-	"errors"
 	"github.com/ahojcn/EoA/ctr/models"
-	"strconv"
-	"strings"
-
-	"github.com/astaxie/beego"
+	"github.com/astaxie/beego/orm"
+	"math"
+	"time"
 )
 
 // HostInfoController operations for HostInfo
 type HostInfoController struct {
-	beego.Controller
+	BaseController
 }
 
-// URLMapping ...
-func (c *HostInfoController) URLMapping() {
-	c.Mapping("Post", c.Post)
-	c.Mapping("GetOne", c.GetOne)
-	c.Mapping("GetAll", c.GetAll)
-	c.Mapping("Put", c.Put)
-	c.Mapping("Delete", c.Delete)
-}
+// 获取主机资源监控记录
+func (c *HostInfoController) GetHostInfo() {
+	_ = c.LoginRequired(true)
 
-// Post ...
-// @Title Post
-// @Description create HostInfo
-// @Param	body		body 	models.HostInfo	true		"body for HostInfo content"
-// @Success 201 {int} models.HostInfo
-// @Failure 403 body is empty
-// @router / [post]
-func (c *HostInfoController) Post() {
-	var v models.HostInfo
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if _, err := models.AddHostInfo(&v); err == nil {
-			c.Ctx.Output.SetStatus(201)
-			c.Data["json"] = v
-		} else {
-			c.Data["json"] = err.Error()
-		}
-	} else {
-		c.Data["json"] = err.Error()
-	}
-	c.ServeJSON()
-}
-
-// GetOne ...
-// @Title Get One
-// @Description get HostInfo by id
-// @Param	id		path 	string	true		"The key for staticblock"
-// @Success 200 {object} models.HostInfo
-// @Failure 403 :id is empty
-// @router /:id [get]
-func (c *HostInfoController) GetOne() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	v, err := models.GetHostInfoById(id)
+	hostId, err := c.GetInt("host_id")
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = v
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
 	}
-	c.ServeJSON()
-}
-
-// GetAll ...
-// @Title Get All
-// @Description get HostInfo
-// @Param	query	query	string	false	"Filter. e.g. col1:v1,col2:v2 ..."
-// @Param	fields	query	string	false	"Fields returned. e.g. col1,col2 ..."
-// @Param	sortby	query	string	false	"Sorted-by fields. e.g. col1,col2 ..."
-// @Param	order	query	string	false	"Order corresponding to each sortby field, if single value, apply to all sortby fields. e.g. desc,asc ..."
-// @Param	limit	query	string	false	"Limit the size of result set. Must be an integer"
-// @Param	offset	query	string	false	"Start position of result set. Must be an integer"
-// @Success 200 {object} models.HostInfo
-// @Failure 403
-// @router / [get]
-func (c *HostInfoController) GetAll() {
-	var fields []string
-	var sortby []string
-	var order []string
-	var query = make(map[string]string)
-	var limit int64 = 10
-	var offset int64
-
-	// fields: col1,col2,entity.col3
-	if v := c.GetString("fields"); v != "" {
-		fields = strings.Split(v, ",")
+	start := c.GetString("start")
+	end := c.GetString("end")
+	if start == "" || end == "" {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
 	}
-	// limit: 10 (default is 10)
-	if v, err := c.GetInt64("limit"); err == nil {
-		limit = v
-	}
-	// offset: 0 (default is 0)
-	if v, err := c.GetInt64("offset"); err == nil {
-		offset = v
-	}
-	// sortby: col1,col2
-	if v := c.GetString("sortby"); v != "" {
-		sortby = strings.Split(v, ",")
-	}
-	// order: desc,asc
-	if v := c.GetString("order"); v != "" {
-		order = strings.Split(v, ",")
-	}
-	// query: k:v,k:v
-	if v := c.GetString("query"); v != "" {
-		for _, cond := range strings.Split(v, ",") {
-			kv := strings.SplitN(cond, ":", 2)
-			if len(kv) != 2 {
-				c.Data["json"] = errors.New("Error: invalid query key/value pair")
-				c.ServeJSON()
-				return
-			}
-			k, v := kv[0], kv[1]
-			query[k] = v
-		}
-	}
-
-	l, err := models.GetAllHostInfo(query, fields, sortby, order, offset, limit)
+	_, err = time.ParseInLocation("2006-01-02", start, time.Local)
 	if err != nil {
-		c.Data["json"] = err.Error()
-	} else {
-		c.Data["json"] = l
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
 	}
-	c.ServeJSON()
-}
+	_, err = time.ParseInLocation("2006-01-02", end, time.Local)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+	}
 
-// Put ...
-// @Title Put
-// @Description update the HostInfo
-// @Param	id		path 	string	true		"The id you want to update"
-// @Param	body		body 	models.HostInfo	true		"body for HostInfo content"
-// @Success 200 {object} models.HostInfo
-// @Failure 403 :id is not int
-// @router /:id [put]
-func (c *HostInfoController) Put() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	v := models.HostInfo{Id: id}
-	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &v); err == nil {
-		if err := models.UpdateHostInfoById(&v); err == nil {
-			c.Data["json"] = "OK"
-		} else {
-			c.Data["json"] = err.Error()
+	var his []models.HostInfo
+	c.o = orm.NewOrm()
+	_, err = c.o.QueryTable(new(models.HostInfo)).Filter("host_id", hostId).Filter("create_time__gte", start).Filter("create_time__lte", end).All(&his)
+	if err != nil {
+		c.ReturnResponse(models.SERVER_ERROR, nil, true)
+	}
+
+	data := make(map[string]interface{})
+	cpu := make([]float64, 0)
+	mem := make([]float64, 0)
+	disk := make([]float64, 0)
+	t := make([]string, 0)
+	for _, hi := range his {
+		var info models.BaseInfo
+		err = json.Unmarshal([]byte(hi.Info), &info)
+		if err != nil {
+			continue
 		}
-	} else {
-		c.Data["json"] = err.Error()
+		cpu = append(cpu, math.Trunc(info.CpuInfo.PercentTotal[0]*1e2+0.5) * 1e-2)
+		mem = append(mem, math.Trunc(info.MemInfo.UsedPercent*1e2+0.5) * 1e-2)
+		disk = append(disk, math.Trunc(info.DiskInfo.UsedPercent*1e2+0.5) * 1e-2)
+		t = append(t, hi.CreateTime.Format("2006-01-02 15:04:05"))
 	}
-	c.ServeJSON()
-}
+	data["cpu"] = cpu
+	data["mem"] = mem
+	data["disk"] = disk
+	data["time"] = t
 
-// Delete ...
-// @Title Delete
-// @Description delete the HostInfo
-// @Param	id		path 	string	true		"The id you want to delete"
-// @Success 200 {string} delete success!
-// @Failure 403 id is empty
-// @router /:id [delete]
-func (c *HostInfoController) Delete() {
-	idStr := c.Ctx.Input.Param(":id")
-	id, _ := strconv.Atoi(idStr)
-	if err := models.DeleteHostInfo(id); err == nil {
-		c.Data["json"] = "OK"
-	} else {
-		c.Data["json"] = err.Error()
-	}
-	c.ServeJSON()
+	c.ReturnResponse(models.SUCCESS, data, true)
 }

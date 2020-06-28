@@ -29,20 +29,22 @@ func init() {
 	beego.Router("/host/ssh", &controllers.HostController{}, "post:HostConnectionTest")
 	// 测试主机svr连接
 	beego.Router("/host/svr", &controllers.HostController{}, "post:HostConnectionSvr")
-
-	// svr 启动后的回调接口
-	beego.Router("/cb/host/baseinfo", &controllers.HostController{}, "post:BaseInfoCallBack")
-
 	// 关注一个主机
 	beego.Router("/host/watch", &controllers.HostWatchController{}, "post:AddHostWatch")
 	// 取消关注一个主机
 	beego.Router("/host/watch", &controllers.HostWatchController{}, "delete:DeleteHostWatch")
-
-	// 创建主机监控
-	beego.Router("/task/host", &controllers.TaskController{}, "post:AddHostInfoTask")
-
 	// 增加一个负责人邮件
 	beego.Router("/host/blame", &controllers.HostBlameEmailController{}, "post:AddHostBlameEmail")
 	// 删除一个负责人邮件
 	beego.Router("/host/blame", &controllers.HostBlameEmailController{}, "delete:DeleteHostBlameEmail")
+
+	// 获取主机的监控日志
+	beego.Router("/host/info", &controllers.HostInfoController{}, "get:GetHostInfo")
+
+	// 创建主机监控
+	beego.Router("/task/host", &controllers.TaskController{}, "post:AddHostInfoTask")
+	beego.Router("/task/host", &controllers.TaskController{}, "delete:DeleteHostInfoTask")
+
+	// svr 启动后的回调接口
+	beego.Router("/cb/host/baseinfo", &controllers.HostController{}, "post:BaseInfoCallBack")
 }

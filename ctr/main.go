@@ -21,7 +21,7 @@ func main() {
 		//AllowAllOrigins:  true,
 		AllowOrigins:     []string{
 			"http://10.*.*.*:*", "http://localhost:*", "http://127.0.0.1:*",
-			"http://*.*.*.*:*"},
+			"http://*.*.*.*:*", "http://39.101.176.8"},
 		AllowCredentials: true,
 		AllowMethods:     []string{"GET", "POST", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Access-Control-Allow-Origin", "Content-Type"},

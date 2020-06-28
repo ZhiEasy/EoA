@@ -139,13 +139,13 @@ func (c *HostController) BaseInfoCallBack() {
 }
 
 // 删除主机
-// TODO 没有删除 host_info 的表，可能后面会存在问题
 // TODO 删除 host task 相关
 func (c *HostController) DeleteHost() {
 	userId := c.LoginRequired(true)
 	hostId := c.GetString("host_id")
 	c.o = orm.NewOrm()
 	// 检查主机是否存在
+	// 如果不是自己创建的主机则不能删除
 	cnt, err := c.o.QueryTable(new(models.Host)).Filter("id", hostId).Filter("user_id", userId).Count()
 	if err != nil || cnt != 1 {
 		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
@@ -212,7 +212,7 @@ func (c *HostController) HostConnectionSvr() {
 	_, err = SvrTest(req.Ip)
 	end := time.Now().UnixNano()
 	if err != nil {
-		c.ReturnResponse(models.HOST_CONN_ERROR, err, true)
+		c.ReturnResponse(models.HOST_CONN_ERROR, nil, true)
 	}
 	d := make(map[string]string)
 	d["used"] = fmt.Sprintf("连接用时 %v ms", (end-start)/1e6)
@@ -265,8 +265,6 @@ func (c *HostController) GetHosts() {
 	d["not_watchs"] = notWatchs
 	c.ReturnResponse(0, d, true)
 }
-
-// TODO 开启主机监控
 
 type SSHClientConfig struct {
 	Host       string      //ip

@@ -130,4 +130,29 @@ func (c *TaskController) AddHostInfoTask() {
 	c.ReturnResponse(models.SUCCESS, taskObj.Name, true)
 }
 
-// TODO 取消任务接口
+// 取消主机监控任务
+func (c *TaskController) DeleteHostInfoTask() {
+	userId := c.LoginRequired(true)
+
+	taskId := c.GetString("task_id")
+	var taskObj models.Task
+	c.o = orm.NewOrm()
+	err := c.o.QueryTable(new(models.Task)).Filter("id", taskId).One(&taskObj)
+	if err != nil {
+		c.ReturnResponse(models.REQUEST_DATA_ERROR, nil, true)
+	}
+
+	// 非本人创建不得删除
+	if taskObj.UserId.Id != userId {
+		c.ReturnResponse(models.AUTH_ERROR, nil, true)
+	}
+
+	// 删除 task 信息
+	err = models.DeleteTask(taskObj.Id)
+	if err != nil {
+		logrus.Warnf("删除任务失败\n用户：%v\n参数taskId：%v\n原因：%v", userId, taskId, err)
+		c.ReturnResponse(models.SERVER_ERROR, nil, true)
+	}
+
+	c.ReturnResponse(models.SUCCESS, taskObj, true)
+}
