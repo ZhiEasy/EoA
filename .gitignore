@@ -4,6 +4,7 @@
 .idea/
 bin/
 tmp/
+**/venv/
 
 ### Go ###
 # Binaries for programs and plugins
